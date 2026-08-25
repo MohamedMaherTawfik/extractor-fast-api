@@ -15,5 +15,5 @@
 - [x] Build Generation Engine
 - [x] Build Product/Sales Engine
 - [x] Build Answer Bot
-- [ ] Build Desktop UI
+- [x] Build Desktop UI
 - [ ] Build Portable Production Runtime

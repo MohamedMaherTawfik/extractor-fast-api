@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Activity, Archive, BarChart3, Bell, Bot, Boxes, CalendarDays, ChevronLeft, CircleDollarSign, ClipboardCheck,
   Command, Factory, FileSearch, Gauge, Grid2X2, Languages, Menu, MessageSquareText, Moon, PackageSearch, PanelLeftClose,
-  Search, Settings, ShieldCheck, Sparkles, Sun, UsersRound, WandSparkles,
+  Search, Settings, ShieldCheck, Sparkles, Sun, UsersRound, WandSparkles, DatabaseZap,
 } from "lucide-react";
 import { operatorApi } from "../api/operator";
 import { useFeatures } from "../app/FeatureContext";
@@ -17,6 +17,7 @@ const nav = [
   ["home", "/", Gauge, "content"], ["content", "/content", Grid2X2, "content"], ["intelligence", "/intelligence", Sparkles, "intelligence"],
   ["patterns", "/patterns", WandSparkles, "patterns_recipes"], ["rules", "/rules", ShieldCheck, "rules"], ["generation", "/generation", Factory, "generation"],
   ["assets", "/assets", Archive, "generation"], ["calendar", "/calendar", CalendarDays, "content_calendar"], ["products", "/products", PackageSearch, "sales"],
+  ["leads", "/data-acquisition", DatabaseZap, "lead_engine"],
   ["customers", "/customers", UsersRound, "sales"], ["sales", "/sales", CircleDollarSign, "sales"], ["inventory", "/inventory", Boxes, "sales"],
   ["suppliers", "/suppliers", Factory, "sales"], ["msc", "/msc", FileSearch, "msc"], ["conversations", "/conversations", MessageSquareText, "answer_bot"],
   ["service", "/customer-service", Bot, "answer_bot"], ["approvals", "/approvals", ClipboardCheck, "rules"], ["analytics", "/analytics", BarChart3, "content"],

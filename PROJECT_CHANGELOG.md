@@ -1,5 +1,20 @@
 # Project Changelog
 
+## 2026-08-25 — Desktop UI / Operator Control Center 1.0.0 — COMPLETE
+
+- Task ID: `prompt_8b_desktop_ui_resume`; resumed the existing Desktop UI and removed only its Windows native-toolchain blocker. Portable Production Runtime / Prompt 9 was not started.
+- Windows prerequisites: removed the canceled, incomplete Visual Studio Build Tools 2026 instance and its C:-hosted package residue, then installed Visual Studio Build Tools 2022 17.14.39 to drive D: with the `Desktop development with C++` workload and recommended components. The completed instance is launchable and reports no reboot requirement.
+- Toolchain: MSVC v143 14.44.35207 / compiler 19.44.35228, Windows SDK 10.0.26100.0 with `rc.exe`, and Visual Studio CMake 3.31.6-msvc6 are available through the discovered developer environment. Installer cache/shared/toolchain storage was directed to D:; the obsolete 2026 instance recovered about 2.35 GB on C: before the SDK installed its required system components.
+- Rust: installed rustup 1.29.0, rustc 1.98.0, Cargo 1.98.0, and the active/default `stable-x86_64-pc-windows-msvc` toolchain under D:-backed user tool directories. Node 24.18.0, npm 11.16.0, and WebView2 151.0.4129.107 were verified.
+- Native development verification: `tauri info` recognized WebView2, Build Tools 2022, Rust, Cargo, and the MSVC target; `tauri dev` compiled 370 Rust/Tauri units, opened the responsive `EMY Control Center` native window, loaded the real WebView2 UI, and remained connected to the project-venv FastAPI backend.
+- Native smoke/E2E: directly inspected the running Tauri WebView and navigated Home, Products, Customers, Sales, Inventory, MSC, Generation, Conversations, Approvals, and Settings with no route error. Local test data verified Product, Customer, Sales Order, Inventory Movement, and MSC Batch list/detail views.
+- Answer Bot native regression: first conversation selection did not crash; a held draft rendered `PENDING REVIEW`, approved to `APPROVED` while retaining an enabled Send action, and sent through the deterministic mock channel to `SENT`.
+- Generation native regression: a local synthetic READY contract enabled and created a non-executing queued job without calling a paid provider; the same contract marked NOT_READY disabled the action and displayed the blocked state.
+- Build: optimized `tauri build` passed and produced `frontend/src-tauri/target/release/emy-control-center.exe` (8.67 MB, SHA-256 `3BA90346CCF31F89ECA135330F1B47120B2047730BC31351086B6743EA9AF2A9`). Bundling remains disabled for this development phase; no installer, signing, updater, portable Python, or production runtime work was performed.
+- Tests: frontend dependency audit found zero vulnerabilities; 4 Vitest files / 8 unit-component-integration tests passed; TypeScript/Vite production compilation passed; live loopback operator endpoints passed; Alembic reached `0009_answer_bot`; dependency and compile checks passed; all 113 backend tests passed.
+- Problems fixed: Vite now ignores `src-tauri` in its frontend watcher so Windows does not raise `EBUSY` while Cargo links executables; the Answer Bot follow-up max-attempt regression now uses a deterministic future non-quiet timestamp instead of a same-day time that could precede the schedule after noon.
+- Project state: `desktop_ui` is complete, `active_task` remains null, and the next task is `portable_production_runtime`.
+
 ## 2026-08-22 — Desktop UI / Operator Control Center 1.0.0 — BLOCKED
 
 - Task ID: `prompt_8_desktop_ui`; built the React/TypeScript control surface in the existing empty `frontend/` directory without starting portable production packaging.

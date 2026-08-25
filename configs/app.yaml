@@ -33,6 +33,12 @@ answer_bot_config_file: answer_bot.yaml
 answer_bot_version: 1.0.0
 run_live_messaging_tests: false
 messaging_privacy_mode: LOCAL_ONLY
+lead_acquisition_config_file: lead_acquisition.yaml
+lead_acquisition_version: 1.0.0
+run_live_overture_tests: false
+run_live_osm_tests: false
+run_live_google_places_tests: false
+run_live_foursquare_tests: false
 creator_import_column_mapping:
   Name: display_name
   Creator: display_name

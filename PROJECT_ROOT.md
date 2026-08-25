@@ -28,6 +28,11 @@ Local-first, private-first, portable, modular, config-driven, and API-first.
 - openpyxl 3.1.5
 - python-multipart 0.0.32
 - YAML and .env configuration
+- Node.js 24.18.0 and npm 11.16.0
+- React 19, TypeScript 7, Vite 8, and Tauri 2
+- Rust/Cargo 1.98.0 with the stable x86_64-pc-windows-msvc toolchain
+- Visual Studio Build Tools 2022 with MSVC v143 and Windows SDK 10.0.26100.0
+- Microsoft Edge WebView2 Runtime 151
 
 ## Current Modules
 
@@ -100,11 +105,12 @@ Local-first, private-first, portable, modular, config-driven, and API-first.
 - Conservative Level 2 auto-send, approval-aware outbound queue, idempotency, bounded retry, delivery status, and dead-letter handoff
 - Human handoff queues/summaries, agent edit audit, consent-aware follow-ups, opt-out/quiet-hours enforcement, and CRM signals
 - Reviewable telesales tasks and factual quote/order drafts that never post Product/Sales transactions
+- Native Windows Desktop UI / Operator Control Center with feature-discovered navigation, API-backed workspaces, Tauri security boundaries, RTL/LTR themes, generation gating, and conversation review/send workflows
 
 ## Important Paths
 
 - backend/ — core API backend and extension contracts
-- frontend/ — future desktop UI
+- frontend/ — React/Vite frontend and Tauri 2 native desktop shell
 - database/ — local SQLite database assets
 - database/migrations/ — versioned Alembic schema
 - configs/ — configuration files
@@ -128,15 +134,15 @@ SQLite is at Alembic revision 0009_answer_bot. In addition to the complete Analy
 
 ## Last Completed Work
 
-Implemented and verified Answer Bot 1.0.0: channel abstraction/registry, normalized messages and conversations, exact contact/customer/lead linking, multilingual multi-intent/entity analysis, read-only grounded Product/Sales and versioned Knowledge context, response planning/generation/validation, conservative auto-send, approval queue/retries/idempotency, delivery state, human handoff, consent-aware follow-ups, CRM/telesales signals, factual sales drafts, APIs, migration, documentation, and security/integration/regression tests.
+Completed and natively verified EMY Control Center 1.0.0 on Windows: installed the MSVC v143/Windows SDK/Rust prerequisites, compiled and launched the Tauri window, verified backend-connected navigation and operational workflows in the real WebView2 surface, passed frontend and backend regressions, and produced the optimized native executable with development bundling intentionally disabled.
 
 ## Current Blockers
 
-No Answer Bot execution blocker. Live messaging connectors are intentionally not configured; only no-network mock and local website-chat adapters are registered. Follow-up quiet hours use a configured fixed UTC offset because Windows does not bundle IANA timezone data. No sales workbook is currently present, and the earlier `MASTER_CONTROL_FILE_NOT_FOUND` and `FFMPEG_NOT_FOUND` limitations remain unchanged. Real messaging, MSC, generation, or conversation providers require explicit future configuration, credentials, permissions, and dedicated live tests.
+No Desktop UI execution blocker. Live messaging connectors are intentionally not configured; only no-network mock and local website-chat adapters are registered. Follow-up quiet hours use a configured fixed UTC offset because Windows does not bundle IANA timezone data. No sales workbook is currently present, and the earlier `MASTER_CONTROL_FILE_NOT_FOUND` and `FFMPEG_NOT_FOUND` limitations remain unchanged. Real messaging, MSC, generation, or conversation providers require explicit future configuration, credentials, permissions, and dedicated live tests.
 
 ## Next Step
 
-Build the Desktop UI next. Do not start it, publishing, live messaging integrations, or portable runtime implicitly from the completed Answer Bot task.
+Build the Portable Production Runtime next. Do not start it, installer engineering, signing, publishing, or live provider integrations implicitly from the completed Desktop UI task.
 
 ## Non-negotiable Rules
 

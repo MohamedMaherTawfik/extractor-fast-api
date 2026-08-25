@@ -26,7 +26,7 @@ class OperatorService:
                 "msc": {"enabled": True, "version": self.settings.sales_engine_version},
                 "answer_bot": {"enabled": True, "version": self.settings.answer_bot_version},
                 "content_calendar": {"enabled": True, "version": "ui-planning-1.0.0", "mode": "planning_read_only"},
-                "lead_engine": {"enabled": False, "status": "not_implemented"},
+                "lead_engine": {"enabled": True, "status": "available", "version": self.settings.lead_acquisition_version},
                 "publishing": {"enabled": False, "status": "not_implemented"},
             },
             "features": {name.replace("-", "_") + "_enabled": True for name in WORKSPACES},
@@ -39,7 +39,7 @@ class OperatorService:
         return {
             "backend": "ONLINE", "database": "ONLINE", "storage": "ONLINE",
             "generation_providers": "ONLINE", "messaging_providers": "ONLINE" if any(item["adapter_registered"] for item in channels) else "NOT_CONFIGURED",
-            "msc_intake": "ONLINE", "queue": "ONLINE",
+            "msc_intake": "ONLINE", "lead_acquisition": "ONLINE", "queue": "ONLINE",
         }
 
     def workspace(self, name: str, offset: int, limit: int) -> dict:
@@ -51,6 +51,6 @@ class OperatorService:
         return {
             "backend": {"host": self.settings.host, "port": self.settings.port, "environment": self.settings.environment},
             "privacy": {"messaging": self.settings.messaging_privacy_mode, "live_generation_tests": self.settings.run_live_generation_tests, "live_messaging_tests": self.settings.run_live_messaging_tests, "live_msc_tests": self.settings.run_live_msc_extraction_tests},
-            "versions": {"app": self.settings.version, "generation": self.settings.generation_engine_version, "sales": self.settings.sales_engine_version, "answer_bot": self.settings.answer_bot_version},
+            "versions": {"app": self.settings.version, "generation": self.settings.generation_engine_version, "sales": self.settings.sales_engine_version, "answer_bot": self.settings.answer_bot_version, "lead_acquisition": self.settings.lead_acquisition_version},
             "channels": ChannelRegistry().status(),
         }

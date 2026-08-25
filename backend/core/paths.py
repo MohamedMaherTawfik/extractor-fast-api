@@ -29,6 +29,10 @@ class ProjectPaths:
     generated_assets: Path
     reference_assets: Path
     provider_responses: Path
+    lead_acquisition: Path
+    lead_raw: Path
+    lead_exports: Path
+    lead_control_imports: Path
     migrations: Path
     database_file: Path
     config_file: Path
@@ -60,6 +64,10 @@ class ProjectPaths:
             generated_assets=project_root / "data" / "assets" / "generated",
             reference_assets=project_root / "data" / "assets" / "references",
             provider_responses=project_root / "data" / "provider_responses",
+            lead_acquisition=project_root / "data" / "lead_acquisition",
+            lead_raw=project_root / "data" / "lead_acquisition" / "raw",
+            lead_exports=project_root / "data" / "lead_acquisition" / "exports",
+            lead_control_imports=project_root / "data" / "imports" / "lead_control",
             migrations=migrations,
             database_file=database / "emy_private_ai_os.db",
             config_file=configs / "app.yaml",
@@ -85,6 +93,10 @@ class ProjectPaths:
             self.generated_assets,
             self.reference_assets,
             self.provider_responses,
+            self.lead_acquisition,
+            self.lead_raw,
+            self.lead_exports,
+            self.lead_control_imports,
             self.migrations,
         ):
             directory.mkdir(parents=True, exist_ok=True)

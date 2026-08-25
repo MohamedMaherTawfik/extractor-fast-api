@@ -99,6 +99,14 @@ class Settings(BaseSettings):
     answer_bot_version: str = "1.0.0"
     run_live_messaging_tests: bool = False
     messaging_privacy_mode: str = "LOCAL_ONLY"
+    lead_acquisition_config_file: str = "lead_acquisition.yaml"
+    lead_acquisition_version: str = "1.0.0"
+    run_live_overture_tests: bool = False
+    run_live_osm_tests: bool = False
+    run_live_google_places_tests: bool = False
+    run_live_foursquare_tests: bool = False
+    google_places_api_key: str | None = Field(default=None, repr=False)
+    foursquare_api_key: str | None = Field(default=None, repr=False)
 
     @property
     def database_url(self) -> str:

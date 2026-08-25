@@ -1,0 +1,123 @@
+version: 1.0.0
+country:
+  code: EG
+  name: Egypt
+  bbox: [24.7, 22.0, 36.9, 31.7]
+  polygon: [[24.7, 22.0], [36.9, 22.0], [36.9, 31.7], [24.7, 31.7], [24.7, 22.0]]
+workbook:
+  directory: data/imports/lead_control
+  patterns: ["EMY_Egypt_Lead_Acquisition_OS_v*.xlsx"]
+  required_sheets: ["Lead Segments", "Keyword Master", "Egypt Coverage", "Source Registry", "Query Matrix", "Run Config"]
+execution:
+  raw_batch_size: 500
+  default_result_limit: 50
+  max_result_limit: 500
+  overture_timeout_seconds: 90
+  smoke_max_records: 20
+  website_timeout_seconds: 12
+  full_scan_priority_classes: ["A+", "A"]
+  geofabrik_url: https://download.geofabrik.de/africa/egypt-latest.osm.pbf
+  overpass_url: https://overpass-api.de/api/interpreter
+sources:
+  - {source_uid: SRC_OVERTURE, name: Overture Maps Places, type: BULK_DISCOVERY, enabled: true, bulk_support: true, query_support: true, geo_support: BBOX_STAC, credentials_required: false, freshness: MONTHLY, terms_status: REVIEWED_OPEN, storage_policy: RAW_JSONL_AND_CANONICAL, rate_limit: CLOUD_RANGE_READS}
+  - {source_uid: SRC_OSM_GEOFABRIK, name: OpenStreetMap / Geofabrik Egypt, type: BULK_DISCOVERY, enabled: true, bulk_support: true, query_support: false, geo_support: EGYPT_EXTRACT, credentials_required: false, freshness: DAILY, terms_status: ODBL_ATTRIBUTION_REQUIRED, storage_policy: PBF_RAW_AND_CANONICAL, rate_limit: DOWNLOAD_ONCE_REUSE}
+  - {source_uid: SRC_FOURSQUARE, name: Foursquare Places API, type: ENRICHMENT, enabled: false, bulk_support: false, query_support: true, geo_support: BBOX, credentials_required: true, credential_setting: foursquare_api_key, freshness: API_CURRENT, terms_status: REVIEW_REQUIRED, storage_policy: MINIMIZED_CANONICAL, rate_limit: PROVIDER_MANAGED}
+  - {source_uid: SRC_GOOGLE_PLACES, name: Google Places API, type: ENRICHMENT, enabled: false, bulk_support: false, query_support: true, geo_support: BBOX, credentials_required: true, credential_setting: google_places_api_key, freshness: API_CURRENT, terms_status: REVIEW_REQUIRED, storage_policy: PROVIDER_TERMS_CONTROLLED, rate_limit: PROVIDER_MANAGED}
+  - {source_uid: SRC_WEBSITE, name: Business Website Enrichment, type: ENRICHMENT, enabled: false, bulk_support: false, query_support: false, geo_support: LEAD_URL, credentials_required: false, freshness: FETCH_TIME, terms_status: ROBOTS_AND_PUBLIC_PAGES_ONLY, storage_policy: PUBLIC_CONTACT_FIELDS_ONLY, rate_limit: PER_DOMAIN}
+  - {source_uid: SRC_OFFICIAL_REGISTRY, name: Official Registry Verification, type: VERIFICATION, enabled: false, bulk_support: false, query_support: false, geo_support: BUSINESS_IDENTITY, credentials_required: true, freshness: UNKNOWN, terms_status: ENDPOINT_NOT_CONFIGURED, storage_policy: VERIFICATION_FACTS_ONLY, rate_limit: NOT_CONFIGURED}
+  - {source_uid: SRC_DIRECTORY, name: Licensed Business Directory, type: DIRECTORY, enabled: false, bulk_support: false, query_support: false, geo_support: UNKNOWN, credentials_required: true, freshness: UNKNOWN, terms_status: DISABLED_BY_DEFAULT_PERMISSION_REQUIRED, storage_policy: NONE_UNTIL_APPROVED, rate_limit: NOT_CONFIGURED}
+scoring:
+  weights:
+    category_fit: 0.22
+    commercial_scale: 0.14
+    professional_consumption: 0.14
+    resale_potential: 0.13
+    contactability: 0.13
+    freshness: 0.08
+    geographic_priority: 0.07
+    verification: 0.09
+  classes: {"A+": 85, "A": 70, "B": 50, "C": 0}
+category_mapping:
+  pharmacy: pharmacies
+  drugstore: pharmacies
+  beauty_salon: ladies_salons
+  hair_salon: ladies_salons
+  barber_shop: men_barbers
+  hairdresser: men_barbers
+  spa: spas
+  medical_spa: medical_spas
+  dermatologist: dermatology_clinics
+  dermatology: dermatology_clinics
+  beauty_supply_store: beauty_supply_stores
+  cosmetics_store: cosmetics_stores
+  cosmetics: cosmetics_stores
+  nail_salon: nail_salons
+  makeup_artist: makeup_artists
+  laser_hair_removal_service: laser_clinics
+  skin_care_clinic: skin_care_centers
+segments:
+  - {category_id: cosmetics_importers, name: Cosmetics Importers, tier: 1, buyer_type: IMPORTER, terms: [cosmetics importer, مستورد مستحضرات تجميل]}
+  - {category_id: cosmetics_distributors, name: Cosmetics Distributors, tier: 1, buyer_type: DISTRIBUTOR, terms: [cosmetics distributor, موزع مستحضرات تجميل]}
+  - {category_id: cosmetics_wholesalers, name: Cosmetics Wholesalers, tier: 1, buyer_type: WHOLESALER, terms: [cosmetics wholesaler, جملة مستحضرات تجميل]}
+  - {category_id: beauty_suppliers, name: Beauty Suppliers, tier: 1, buyer_type: SUPPLIER, terms: [beauty supplier, مورد مستلزمات تجميل]}
+  - {category_id: barber_equipment_importers, name: Barber Equipment Importers, tier: 1, buyer_type: IMPORTER, terms: [barber equipment importer, مستورد معدات حلاقة]}
+  - {category_id: barber_equipment_distributors, name: Barber Equipment Distributors, tier: 1, buyer_type: DISTRIBUTOR, terms: [barber equipment distributor, موزع معدات حلاقة]}
+  - {category_id: barber_tools_wholesalers, name: Barber Tools Wholesalers, tier: 1, buyer_type: WHOLESALER, terms: [barber tools wholesale, جملة ادوات حلاقة]}
+  - {category_id: salon_equipment_suppliers, name: Salon Equipment Suppliers, tier: 1, buyer_type: SUPPLIER, terms: [salon equipment supplier, مورد معدات صالونات]}
+  - {category_id: cosmetics_stores, name: Cosmetics Stores, tier: 2, buyer_type: RETAILER, terms: [cosmetics store, محل مستحضرات تجميل]}
+  - {category_id: beauty_supply_stores, name: Beauty Supply Stores, tier: 2, buyer_type: RETAILER, terms: [beauty supply store, محل مستلزمات تجميل]}
+  - {category_id: hairdresser_supply_stores, name: Hairdresser Supply Stores, tier: 2, buyer_type: RETAILER, terms: [hairdresser supply, مستلزمات كوافير]}
+  - {category_id: barber_supply_stores, name: Barber Supply Stores, tier: 2, buyer_type: RETAILER, terms: [barber supply store, محل مستلزمات حلاقة]}
+  - {category_id: perfumeries, name: Perfumeries, tier: 2, buyer_type: RETAILER, terms: [perfumery, محل عطور]}
+  - {category_id: ladies_salons, name: Ladies Salons, tier: 1, buyer_type: PROFESSIONAL_SERVICE, terms: [ladies salon, beauty salon, كوافير حريمي, صالون تجميل]}
+  - {category_id: men_barbers, name: Men Barbers, tier: 1, buyer_type: PROFESSIONAL_SERVICE, terms: [barber shop, men barber, حلاق رجالي, كوافير رجالي]}
+  - {category_id: unisex_salons, name: Unisex Salons, tier: 1, buyer_type: PROFESSIONAL_SERVICE, terms: [unisex salon, صالون حريمي ورجالي]}
+  - {category_id: beauty_centers, name: Beauty Centers, tier: 1, buyer_type: PROFESSIONAL_SERVICE, terms: [beauty center, مركز تجميل]}
+  - {category_id: makeup_artists, name: Makeup Artists, tier: 2, buyer_type: PROFESSIONAL_SERVICE, terms: [makeup artist, ميكب ارتست]}
+  - {category_id: nail_salons, name: Nail Salons, tier: 2, buyer_type: PROFESSIONAL_SERVICE, terms: [nail salon, مركز اظافر]}
+  - {category_id: lash_studios, name: Lash Studios, tier: 2, buyer_type: PROFESSIONAL_SERVICE, terms: [lash studio, رموش]}
+  - {category_id: brow_studios, name: Brow Studios, tier: 2, buyer_type: PROFESSIONAL_SERVICE, terms: [brow studio, حواجب]}
+  - {category_id: spas, name: Spas, tier: 2, buyer_type: PROFESSIONAL_SERVICE, terms: [spa, سبا]}
+  - {category_id: skin_care_centers, name: Skin Care Centers, tier: 1, buyer_type: CLINIC, terms: [skin care center, مركز عناية بالبشرة]}
+  - {category_id: waxing_centers, name: Waxing Centers, tier: 2, buyer_type: PROFESSIONAL_SERVICE, terms: [waxing center, مركز ازالة شعر]}
+  - {category_id: laser_clinics, name: Laser Clinics, tier: 1, buyer_type: CLINIC, terms: [laser clinic, عيادة ليزر]}
+  - {category_id: dermatology_clinics, name: Dermatology Clinics, tier: 1, buyer_type: CLINIC, terms: [dermatology clinic, عيادة جلدية]}
+  - {category_id: aesthetic_clinics, name: Aesthetic Clinics, tier: 1, buyer_type: CLINIC, terms: [aesthetic clinic, عيادة تجميل]}
+  - {category_id: medical_spas, name: Medical Spas, tier: 1, buyer_type: CLINIC, terms: [medical spa, سبا طبي]}
+  - {category_id: beauty_academies, name: Beauty Academies, tier: 2, buyer_type: ACADEMY, terms: [beauty academy, اكاديمية تجميل]}
+  - {category_id: barber_academies, name: Barber Academies, tier: 2, buyer_type: ACADEMY, terms: [barber academy, اكاديمية حلاقة]}
+  - {category_id: pharmacies, name: Pharmacies, tier: 1, buyer_type: RETAILER, terms: [pharmacy, صيدلية]}
+  - {category_id: online_beauty_sellers, name: Online Beauty Sellers, tier: 2, buyer_type: ONLINE_RETAILER, terms: [online beauty store, متجر تجميل اونلاين]}
+  - {category_id: beauty_boutiques, name: Beauty Boutiques, tier: 2, buyer_type: RETAILER, terms: [beauty boutique, بوتيك تجميل]}
+  - {category_id: hair_treatment_centers, name: Hair Treatment Centers, tier: 1, buyer_type: PROFESSIONAL_SERVICE, terms: [hair treatment center, مركز علاج الشعر]}
+  - {category_id: hair_extension_stores, name: Hair Extension Stores, tier: 2, buyer_type: RETAILER, terms: [hair extension store, محل اكستنشن شعر]}
+  - {category_id: professional_grooming_centers, name: Professional Grooming Centers, tier: 1, buyer_type: PROFESSIONAL_SERVICE, terms: [professional grooming center, مركز عناية رجالي]}
+  - {category_id: beauty_equipment_stores, name: Beauty Equipment Stores, tier: 1, buyer_type: RETAILER, terms: [beauty equipment store, محل معدات تجميل]}
+governorates:
+  - {id: alexandria, name: Alexandria, name_ar: الإسكندرية, bbox: [29.45, 30.75, 30.15, 31.40], density: HIGH}
+  - {id: aswan, name: Aswan, name_ar: أسوان, bbox: [30.90, 21.70, 33.30, 24.80], density: LOW}
+  - {id: asyut, name: Asyut, name_ar: أسيوط, bbox: [30.40, 26.70, 32.00, 27.80], density: MEDIUM}
+  - {id: beheira, name: Beheira, name_ar: البحيرة, bbox: [29.50, 30.40, 31.00, 31.50], density: MEDIUM}
+  - {id: beni_suef, name: Beni Suef, name_ar: بني سويف, bbox: [30.60, 28.65, 31.80, 29.50], density: MEDIUM}
+  - {id: cairo, name: Cairo, name_ar: القاهرة, bbox: [31.10, 29.80, 31.75, 30.35], density: HIGH}
+  - {id: dakahlia, name: Dakahlia, name_ar: الدقهلية, bbox: [30.95, 30.55, 32.20, 31.60], density: HIGH}
+  - {id: damietta, name: Damietta, name_ar: دمياط, bbox: [31.45, 31.10, 32.10, 31.55], density: HIGH}
+  - {id: faiyum, name: Faiyum, name_ar: الفيوم, bbox: [30.20, 28.90, 31.00, 29.70], density: MEDIUM}
+  - {id: gharbia, name: Gharbia, name_ar: الغربية, bbox: [30.70, 30.55, 31.30, 31.20], density: HIGH}
+  - {id: giza, name: Giza, name_ar: الجيزة, bbox: [28.90, 27.80, 31.45, 30.70], density: HIGH}
+  - {id: ismailia, name: Ismailia, name_ar: الإسماعيلية, bbox: [31.60, 30.15, 32.70, 31.00], density: MEDIUM}
+  - {id: kafr_el_sheikh, name: Kafr El Sheikh, name_ar: كفر الشيخ, bbox: [30.25, 30.95, 31.25, 31.65], density: MEDIUM}
+  - {id: luxor, name: Luxor, name_ar: الأقصر, bbox: [32.20, 25.25, 33.30, 26.15], density: MEDIUM}
+  - {id: matrouh, name: Matrouh, name_ar: مطروح, bbox: [24.70, 29.00, 29.80, 31.70], density: LOW}
+  - {id: minya, name: Minya, name_ar: المنيا, bbox: [30.40, 27.45, 32.00, 28.90], density: MEDIUM}
+  - {id: monufia, name: Monufia, name_ar: المنوفية, bbox: [30.50, 30.15, 31.25, 30.85], density: HIGH}
+  - {id: new_valley, name: New Valley, name_ar: الوادي الجديد, bbox: [24.50, 22.00, 31.50, 28.00], density: LOW}
+  - {id: north_sinai, name: North Sinai, name_ar: شمال سيناء, bbox: [32.50, 30.45, 34.90, 31.40], density: LOW}
+  - {id: port_said, name: Port Said, name_ar: بورسعيد, bbox: [31.80, 30.80, 32.65, 31.35], density: HIGH}
+  - {id: qalyubia, name: Qalyubia, name_ar: القليوبية, bbox: [30.95, 30.05, 31.65, 30.65], density: HIGH}
+  - {id: qena, name: Qena, name_ar: قنا, bbox: [31.50, 25.75, 33.10, 27.00], density: MEDIUM}
+  - {id: red_sea, name: Red Sea, name_ar: البحر الأحمر, bbox: [33.00, 22.00, 36.90, 29.50], density: LOW}
+  - {id: sharqia, name: Sharqia, name_ar: الشرقية, bbox: [31.10, 30.25, 32.40, 31.20], density: HIGH}
+  - {id: sohag, name: Sohag, name_ar: سوهاج, bbox: [30.90, 25.90, 32.50, 27.00], density: MEDIUM}
+  - {id: south_sinai, name: South Sinai, name_ar: جنوب سيناء, bbox: [32.60, 27.60, 34.90, 30.00], density: LOW}
+  - {id: suez, name: Suez, name_ar: السويس, bbox: [32.10, 29.45, 33.00, 30.25], density: MEDIUM}

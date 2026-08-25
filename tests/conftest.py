@@ -48,12 +48,18 @@ from backend.db.models.answer_bot import (
     MessageDeliveryEvent, MessageEdit, OrderDraft, QuoteDraft, ResponsePlan,
     ResponseTemplate, TelesalesTask, TemplateVersion, WebhookEvent,
 )
+from backend.db.models.leads import (
+    Lead, LeadControlImport, LeadDedupeEvent, LeadJob, LeadRun, LeadSource,
+    LeadSourceRecord, OptInLead,
+)
 from backend.db.session import init_database, session_scope
 from backend.main import app
 
 
 def clear_domain_data() -> None:
     with session_scope() as session:
+        for model in (LeadDedupeEvent, LeadSourceRecord, LeadJob, LeadRun, Lead, LeadControlImport, OptInLead, LeadSource):
+            session.execute(delete(model))
         for model in (
             MessageDeliveryEvent, MessageEdit, BotDecision, ResponsePlan,
             EntityExtraction, IntentResult, MessageAttachment,
@@ -131,6 +137,8 @@ def isolated_domain_data():
     existing_media_files = set(paths.media.rglob("*"))
     existing_generated_files = set(paths.generated_assets.rglob("*"))
     existing_provider_responses = set(paths.provider_responses.rglob("*"))
+    existing_lead_files = set(paths.lead_acquisition.rglob("*"))
+    existing_lead_control_files = set(paths.lead_control_imports.rglob("*"))
     clear_domain_data()
     yield
     clear_domain_data()
@@ -140,6 +148,8 @@ def isolated_domain_data():
         (paths.media, existing_media_files),
         (paths.generated_assets, existing_generated_files),
         (paths.provider_responses, existing_provider_responses),
+        (paths.lead_acquisition, existing_lead_files),
+        (paths.lead_control_imports, existing_lead_control_files),
     ):
         for created_path in sorted(
             set(base.rglob("*")) - existing,

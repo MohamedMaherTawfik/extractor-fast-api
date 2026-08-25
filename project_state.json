@@ -1,6 +1,6 @@
 {
   "project": "EMY_PRIVATE_AI_OS",
-  "stage": "answer_bot",
+  "stage": "desktop_ui",
   "environment_ready": true,
   "active_task": null,
   "completed_modules": [
@@ -13,9 +13,10 @@
     "rules_engine",
     "generation_engine",
     "product_sales_engine",
-    "answer_bot"
+    "answer_bot",
+    "desktop_ui"
   ],
-  "next_task": "desktop_ui",
+  "next_task": "portable_production_runtime",
   "known_issues": [
     "MASTER_CONTROL_FILE_NOT_FOUND: no EMY Creative Generation Master OS workbook is currently present; the preview/import interface is ready for a later project-relative file",
     "FFMPEG_NOT_FOUND: video generation is shot-based and persisted, while final video assembly currently produces a safe manifest-only plan until an FFmpeg binary is configured",

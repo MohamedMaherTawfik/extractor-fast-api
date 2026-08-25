@@ -73,6 +73,10 @@ from backend.db.models.answer_bot import (
     MessageDeliveryEvent, MessageEdit, OrderDraft, QuoteDraft, ResponsePlan,
     ResponseTemplate, TelesalesTask, TemplateVersion, WebhookEvent,
 )
+from backend.db.models.leads import (
+    Lead, LeadControlImport, LeadDedupeEvent, LeadJob, LeadRun, LeadSource,
+    LeadSourceRecord, OptInLead,
+)
 
 __all__ = [
     "AnalysisResult",
@@ -149,6 +153,8 @@ __all__ = [
     "OrderDraft", "KnowledgeItem", "KnowledgeVersion", "ResponseTemplate",
     "TemplateVersion", "ConversationSummary", "ConversationEvent",
     "WebhookEvent",
+    "LeadSource", "LeadRun", "LeadJob", "Lead", "LeadSourceRecord",
+    "LeadDedupeEvent", "LeadControlImport", "OptInLead",
 ]
 from backend.db.models.analysis import (
     AnalysisResult,

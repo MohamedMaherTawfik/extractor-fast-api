@@ -3,11 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { mockBackend, renderApp } from "./renderApp";
 
 describe("application shell", () => {
-  it("discovers features, renders operational navigation, and hides unavailable leads", async () => {
+  it("discovers features and renders lead acquisition navigation", async () => {
     mockBackend(); renderApp();
     expect(await screen.findByText("Good morning, Operator.")).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Main navigation" })).toBeInTheDocument();
-    expect(screen.queryByText("Leads")).not.toBeInTheDocument();
+    expect(screen.getByTitle("اكتساب البيانات")).toBeInTheDocument();
     expect(screen.getByText("LOCAL_ONLY")).toBeInTheDocument();
   });
   it("opens the command palette with Ctrl+K and switches RTL to LTR", async () => {

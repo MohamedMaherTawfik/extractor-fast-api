@@ -155,7 +155,8 @@ def test_opt_out_followup_consent_quiet_and_max_attempts():
         with pytest.raises(MessagingValidationError): FollowUpService(session).create(FollowUpCreate(conversation_id=conversation.id, reason="marketing", message_type="MARKETING_MESSAGE", scheduled_at=datetime.now(UTC)))
         contact.do_not_contact = False
         followup = FollowUpService(session).create(FollowUpCreate(conversation_id=conversation.id, reason="service", message_type="SERVICE_MESSAGE", scheduled_at=datetime.now(UTC) - timedelta(minutes=1), max_attempts=1))
-        FollowUpService(session).run_due(datetime.now(UTC).replace(hour=12))
+        run_at = (datetime.now(UTC) + timedelta(days=1)).replace(hour=12, minute=0, second=0, microsecond=0)
+        FollowUpService(session).run_due(run_at)
         assert followup.status == "STOPPED" and followup.stopped_reason == "MAX_ATTEMPTS"
 
 

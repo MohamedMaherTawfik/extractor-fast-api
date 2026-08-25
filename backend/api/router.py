@@ -14,6 +14,7 @@ from backend.api.commerce import router as commerce_router
 from backend.api.answer_bot import router as answer_bot_router
 from backend.api.generation import router as generation_router
 from backend.api.operator import router as operator_router
+from backend.api.leads import router as leads_router
 
 
 api_router = APIRouter()
@@ -29,3 +30,4 @@ api_router.include_router(generation_router)
 api_router.include_router(commerce_router)
 api_router.include_router(answer_bot_router)
 api_router.include_router(operator_router)
+api_router.include_router(leads_router)

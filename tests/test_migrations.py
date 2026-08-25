@@ -141,6 +141,14 @@ def test_database_migrations_upgrade_and_downgrade(tmp_path) -> None:
         "conversation_summaries",
         "conversation_events",
         "messaging_webhook_events",
+        "lead_sources",
+        "lead_runs",
+        "lead_jobs",
+        "leads",
+        "lead_source_records",
+        "lead_dedupe_events",
+        "lead_control_imports",
+        "opt_in_leads",
     }
     assert revision == CURRENT_SCHEMA_REVISION
     assert expected_tables == set(inspect(engine).get_table_names())

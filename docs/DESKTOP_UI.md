@@ -48,7 +48,9 @@ Arabic is the default and sets `dir=rtl`; English switches the complete shell to
 
 The Tauri 2 configuration disables bundling for this development phase. Its capability grants only `core:default` and the open-file dialog. There is no shell, process, unrestricted filesystem, updater, or arbitrary command permission. A restrictive CSP allows only the local backend connection and Tauri IPC/assets. The React application never receives API keys.
 
-WebView2 is present. Rust 1.98.0 and Cargo 1.98.0 were installed and the Cargo manifest validates. The host does not currently have the required Microsoft Visual C++ Build Tools and Windows SDK. The official installer was attempted but Windows returned exit code 1602, so a native `tauri dev` compile cannot complete on this host until that privileged prerequisite is installed. This limitation does not affect the verified React/Vite application or backend integration.
+WebView2 151 is present. Rust 1.98.0 and Cargo 1.98.0 use the stable `x86_64-pc-windows-msvc` toolchain. Visual Studio Build Tools 2022 17.14.39 supplies MSVC v143 14.44, CMake 3.31.6, and Windows SDK 10.0.26100.0. Native `tauri dev` and optimized `tauri build` both compile successfully on this host.
+
+Native verification used the real Tauri WebView2 window with the local FastAPI backend. It covered the app shell, backend connection, Home, Products, Customers, Sales, Inventory, MSC, Generation, Conversations, Approvals, and Settings. Seeded local-only data verified list/detail drawers, first conversation selection, held-draft approval, preservation of the enabled Send action, mock-channel sending, READY generation flow without execution, and NOT_READY generation blocking. This is a documented native smoke/E2E verification; the repository does not add a separately maintained Windows UI automation harness in this phase.
 
 ## Development and testing
 
@@ -65,7 +67,7 @@ Backend development:
 .\.venv\Scripts\python.exe -m backend.main
 ~~~
 
-One-command development after MSVC Build Tools are present:
+One-command native development:
 
 ~~~powershell
 scripts\dev_desktop.ps1
