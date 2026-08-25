@@ -1,0 +1,2 @@
+Do you need a faster workflow?
+This line is a fixture, not generated analysis output.

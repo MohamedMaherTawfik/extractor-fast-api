@@ -1,0 +1,29 @@
+version: "1.0.0"
+thresholds:
+  min_pattern_support_count: 3
+  min_pattern_support_ratio: 0.20
+  min_confidence: 0.65
+  minimum_sample_size: 5
+  minimum_source_contents: 3
+  minimum_source_creators: 2
+  early_position_max: 0.20
+  short_hook_max_ratio: 0.15
+  fast_cut_max_average_ms: 1800
+score_weights:
+  support: 0.30
+  confidence: 0.25
+  performance: 0.20
+  consistency: 0.15
+  recency: 0.10
+similarity_weights:
+  identity: 0.05
+  structure: 0.30
+  visual: 0.15
+  copy: 0.15
+  audio: 0.10
+  editing: 0.10
+  product: 0.10
+  cta: 0.05
+performance:
+  baseline: cohort_median
+  minimum_denominator: 1

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "EMY Control Center",
+  "version": "1.0.0",
+  "identifier": "com.emy.privateai.controlcenter",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://127.0.0.1:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:8000; img-src 'self' asset: http://asset.localhost data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:"
+    },
+    "windows": [{
+      "title": "EMY Control Center",
+      "width": 1440,
+      "height": 900,
+      "minWidth": 1024,
+      "minHeight": 680,
+      "resizable": true,
+      "fullscreen": false
+    }]
+  },
+  "bundle": { "active": false }
+}

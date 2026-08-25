@@ -1,0 +1,112 @@
+version: "1.0.0"
+rules:
+  - rule_id: RULE_METADATA_DURATION
+    field: duration_ms
+    applies_to: [all]
+    analysis_level: content
+    source: duration_ms
+    method: content_field
+    engine: metadata
+    output_type: integer
+    required: false
+    confidence_threshold: 1.0
+    evidence_required: true
+  - rule_id: RULE_VIDEO_HOOK
+    field: hook_type
+    applies_to: [video]
+    analysis_level: segment
+    source: hook_type
+    method: observation
+    engine: video_structure
+    output_type: string
+    required: false
+    confidence_threshold: 0.75
+    evidence_required: true
+  - rule_id: RULE_SHOT_SIZE
+    field: shot_size
+    applies_to: [video]
+    analysis_level: shot
+    source: shot_size
+    method: observation
+    engine: vision
+    output_type: string
+    required: false
+    confidence_threshold: 0.7
+    evidence_required: true
+  - rule_id: RULE_DOMINANT_COLORS
+    field: dominant_colors
+    applies_to: [video, image, carousel]
+    analysis_level: content
+    source: dominant_colors
+    method: observation
+    engine: vision
+    output_type: list
+    required: false
+    confidence_threshold: 0.7
+    evidence_required: true
+  - rule_id: RULE_AUDIO_ENERGY
+    field: audio_energy
+    applies_to: [video, audio]
+    analysis_level: audio_event
+    source: audio_energy
+    method: observation
+    engine: audio
+    output_type: number
+    required: false
+    confidence_threshold: 0.7
+    evidence_required: true
+  - rule_id: RULE_SPOKEN_TEXT
+    field: spoken_text
+    applies_to: [video, audio]
+    analysis_level: text_event
+    source: spoken_text
+    method: observation
+    engine: speech
+    output_type: string
+    required: false
+    confidence_threshold: 0.8
+    evidence_required: true
+  - rule_id: RULE_OCR_TEXT
+    field: ocr_text
+    applies_to: [video, image, carousel]
+    analysis_level: text_event
+    source: ocr_text
+    method: observation
+    engine: ocr
+    output_type: string
+    required: false
+    confidence_threshold: 0.8
+    evidence_required: true
+  - rule_id: RULE_CTA_TYPE
+    field: cta_type
+    applies_to: [text, video, audio, image, carousel]
+    analysis_level: content
+    source: cta_type
+    method: observation
+    engine: copy
+    output_type: string
+    required: false
+    confidence_threshold: 0.75
+    evidence_required: true
+  - rule_id: RULE_NEED_STATE
+    field: need_state
+    applies_to: [text, video, audio, image, carousel]
+    analysis_level: content
+    source: need_state
+    method: observation
+    engine: behavior
+    output_type: string
+    required: false
+    confidence_threshold: 0.8
+    evidence_required: true
+  - rule_id: RULE_MAIN_TOPIC
+    field: main_topic
+    applies_to: [text, video, audio, image, carousel]
+    analysis_level: content
+    source: main_topic
+    method: observation
+    engine: seo
+    output_type: string
+    required: false
+    confidence_threshold: 0.75
+    evidence_required: true

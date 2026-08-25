@@ -1,0 +1,66 @@
+version: 1.0.0
+automation_level: LEVEL_2_LOW_RISK_AUTO
+intent_confidence_threshold: 0.78
+entity_confidence_threshold: 0.80
+stale_business_data_seconds: 300
+privacy_mode: LOCAL_ONLY
+provider: deterministic_local
+prompt_version: 1.0.0
+max_context_messages: 12
+max_context_characters: 12000
+max_send_attempts: 3
+retry_backoff_seconds: [1, 5, 30]
+quiet_hours: {start: "22:00", end: "08:00", timezone: Africa/Cairo, utc_offset: 3}
+business_hours: {start: "09:00", end: "18:00", weekdays: [0, 1, 2, 3, 4, 5]}
+sla_minutes: {first_response: 30, resolution: 1440, high_priority: 10}
+retention_days: {messages: 365, attachments: 90, transcripts: 90}
+channels:
+  mock: {enabled: true, availability: available, live: false, max_length: 4096}
+  website_chat: {enabled: true, availability: local_only, live: false, max_length: 4096}
+  whatsapp: {enabled: false, availability: not_configured, live: false, max_length: 1500}
+  instagram_dm: {enabled: false, availability: not_configured, live: false, max_length: 1000}
+  facebook_messenger: {enabled: false, availability: not_configured, live: false, max_length: 2000}
+  email: {enabled: false, availability: not_configured, live: false, max_length: 10000}
+  telegram: {enabled: false, availability: not_configured, live: false, max_length: 4096}
+  sms: {enabled: false, availability: not_configured, live: false, max_length: 480}
+  call_center_notes: {enabled: true, availability: local_only, live: false, max_length: 10000}
+auto_send_intents: [GREETING, PRODUCT_INFO, PRICE_QUERY, STOCK_QUERY, ORDER_STATUS, LOCATION_QUERY, BRANCH_QUERY, CONTACT_QUERY, HOW_TO_USE]
+never_auto_send: [COMPLAINT, PAYMENT_QUERY, BALANCE_QUERY, RETURN_QUERY, MEDICAL_CONCERN, UNKNOWN]
+intent_examples:
+  GREETING: [hello, hi, hey, السلام عليكم, اهلا, أهلا, ازيك, صباح الخير, مساء الخير]
+  PRODUCT_INFO: [product details, ingredients, features, معلومات المنتج, تفاصيل المنتج, المكونات, المواصفات]
+  PRICE_QUERY: [price, cost, بكام, السعر, سعر, كام جنيه]
+  STOCK_QUERY: [stock, available, موجود, موجودة, متوفر, لسه موجود, هينزل امتى]
+  WHOLESALE_QUERY: [wholesale, distributor, جملة, سعر تاجر, موزع, كمية كبيرة]
+  RETAIL_QUERY: [retail, قطاعي]
+  DISCOUNT_QUERY: [discount, خصم, تخفيض]
+  MOQ_QUERY: [moq, minimum order, اقل كمية, أقل كمية]
+  ORDER_CREATE_INTENT: [order, buy, purchase, عايز اطلب, عاوز اطلب, ابعتهولي, اطلب]
+  ORDER_STATUS: [order status, track order, حالة الطلب, طلبي فين, وصل فين]
+  PAYMENT_QUERY: [payment, paid, transfer, دفعت, الدفع, تحويل, ايصال الدفع]
+  BALANCE_QUERY: [balance, رصيدي, الحساب, مديونية]
+  DELIVERY_QUERY: [delivery, eta, يوصل امتى, التوصيل, الشحن]
+  RETURN_QUERY: [return, refund, استرجاع, ارجاع, مرتجع]
+  COMPLAINT: [complaint, broken, wrong item, missing item, شكوى, بايظ, غلط, ناقص, متأخر جدا]
+  PRODUCT_RECOMMENDATION: [recommend, suggest, ترشح, انسب, مناسب]
+  HOW_TO_USE: [how to use, طريقة الاستخدام, استخدمه ازاي]
+  PRODUCT_COMPARISON: [compare, difference, الفرق, مقارنة]
+  SKIN_HAIR_BEAUTY_QUESTION: [skin, hair, acne, جلد, شعر, حبوب, تشخيص, علاج]
+  LOCATION_QUERY: [location, address, مكان, عنوان, فين]
+  BRANCH_QUERY: [branch, nearest branch, فرع, أقرب فرع, اقرب فرع]
+  CONTACT_QUERY: [contact, phone, رقم, تواصل]
+  FOLLOW_UP: [follow up, متابعة, لسه]
+  SALES_OBJECTION: [expensive, too high, غالي, خصم, مش جاهز]
+  BULK_ORDER: [bulk, volume, كمية كبيرة, كرتونة]
+  SUPPLIER_QUERY: [supplier, supply, مورد, توريد]
+  PARTNERSHIP_QUERY: [partnership, partner, تعاون, شراكة]
+entity_catalogs:
+  governorates: [cairo, giza, alexandria, القاهرة, الجيزة, الإسكندرية, الاسكندرية]
+  payment_methods: [cash, cod, card, visa, instapay, bank transfer, كاش, نقدي, عند الاستلام, فيزا, انستاباي, تحويل بنكي]
+  requested_actions: [buy, order, cancel, return, call, quote, اطلب, شراء, الغي, إلغاء, ارجع, استرجاع, اتصل, عرض سعر]
+opt_out_phrases: [stop, unsubscribe, do not contact, متبعتليش, متبعتليش تاني, مش عاوز رسائل, وقف الرسائل]
+prompt_injection_phrases: [ignore previous instructions, ignore all rules, reveal system prompt, admin password, all customer balances, تجاهل التعليمات, اظهر كل ارصدة العملاء]
+medical_terms: [diagnose, diagnosis, disease, medicine, treatment, تشخيص, مرض, دواء, علاج]
+serious_complaint_terms: [legal, lawyer, police, threat, injury, محامي, شرطة, تهديد, إصابة, اصابة]
+forbidden_claims: [100%, guaranteed, cure, best product, مضمون, يعالج, نتيجة مؤكدة, افضل منتج, أفضل منتج]
+human_queues: [SALES, CUSTOMER_SERVICE, RETURNS, PAYMENTS, WHOLESALE, TECHNICAL, MANAGER]

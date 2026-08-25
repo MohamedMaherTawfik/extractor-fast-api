@@ -1,0 +1,39 @@
+version: "1.0.0"
+prohibited_analysis_fields:
+  - mental_health_diagnosis
+  - personality_diagnosis
+  - sensitive_trait_inference
+  - protected_attribute_inference
+collector_only_fields:
+  - views
+  - reach
+  - likes
+  - comments
+  - shares
+  - saves
+  - orders
+fields:
+  duration_ms:
+    description: Observable content duration in milliseconds.
+  hook_type:
+    description: Evidence-backed opening structure.
+    allowed_values: [question, statement, demonstration, pattern_interrupt, combined]
+  shot_size:
+    description: Observable shot framing.
+    allowed_values: [extreme_close_up, close_up, medium, wide, extreme_wide, unknown]
+  dominant_colors:
+    description: Dominant colors represented as standard HEX values where available.
+  audio_energy:
+    description: Evidence-backed normalized audio energy.
+  spoken_text:
+    description: Verbatim timestamped speech; never inferred text.
+  ocr_text:
+    description: Verbatim visible text with time or bounding-box evidence.
+  cta_type:
+    description: Observable call-to-action form.
+    allowed_values: [none, learn_more, visit, buy, subscribe, contact, download, other]
+  need_state:
+    description: Observable expressed need, without sensitive psychological inference.
+    allowed_values: [explicit_problem, explicit_goal, comparison, proof_request, convenience, unknown]
+  main_topic:
+    description: Evidence-backed primary content topic.

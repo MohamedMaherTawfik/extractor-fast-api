@@ -1,0 +1,65 @@
+version: 1.0.0
+provider_preference: local_first
+default_max_attempts: 3
+provider_timeout_seconds: 60
+health_cache_seconds: 30
+generation_cache_enabled: true
+max_asset_size_bytes: 104857600
+allowed_mime_types:
+  text/plain: txt
+  application/json: json
+  image/png: png
+  image/jpeg: jpg
+  video/mp4: mp4
+  audio/wav: wav
+  audio/mpeg: mp3
+providers:
+  - provider_code: mock_local
+    display_name: Deterministic Local Mock
+    locality: local
+    enabled: true
+    availability: available
+  - provider_code: mock_remote_fallback
+    display_name: Deterministic Remote Mock Fallback
+    locality: remote
+    enabled: true
+    availability: available
+models:
+  - provider_code: mock_local
+    model_id: mock-multimodal
+    model_version: 1.0.0
+    enabled: true
+    availability: available
+    quality_score: 0.70
+    privacy_score: 1.0
+    cost_score: 1.0
+    latency_score: 0.90
+    capabilities:
+      outputs: [text, copy, script, storyboard, image, image_variation, image_edit, video, video_shot, video_sequence, audio, voice, sfx, music_brief, captions, transcript, audio_description_draft, multimodal_package]
+      supports_seed: true
+      supports_structured_output: true
+      supports_reference_images: true
+      supports_mask_editing: true
+      supports_image_to_video: true
+      supports_audio_conditioning: true
+      supported_aspect_ratios: ["1:1", "4:5", "9:16", "16:9"]
+      supported_resolutions: ["1080x1080", "1080x1350", "1080x1920", "1920x1080"]
+  - provider_code: mock_remote_fallback
+    model_id: mock-fallback
+    model_version: 1.0.0
+    enabled: true
+    availability: available
+    quality_score: 0.65
+    privacy_score: 0.50
+    cost_score: 0.50
+    latency_score: 0.60
+    capabilities:
+      outputs: [text, copy, script, storyboard, image, video_shot, audio, voice, captions, transcript]
+      supports_seed: true
+      supports_structured_output: true
+      supports_reference_images: true
+      supports_mask_editing: false
+      supports_image_to_video: false
+      supports_audio_conditioning: false
+      supported_aspect_ratios: ["1:1", "9:16", "16:9"]
+      supported_resolutions: ["1080x1080", "1080x1920", "1920x1080"]

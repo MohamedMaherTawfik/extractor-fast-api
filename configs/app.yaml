@@ -1,0 +1,62 @@
+app_name: EMY Private AI OS
+environment: local
+version: 0.1.0
+host: 127.0.0.1
+port: 8000
+log_level: INFO
+database_echo: false
+import_max_file_size_mb: 25
+analysis_rules_file: analysis_extraction.yaml
+analysis_taxonomy_file: content_analysis.yaml
+analyzer_version: 1.0.0
+analysis_chunk_size_bytes: 1048576
+frame_sampling_interval_ms: 1000
+pattern_config_file: pattern_mining.yaml
+pattern_engine_version: 1.0.0
+recipe_engine_version: 1.0.0
+rules_config_file: rules.yaml
+rules_engine_version: 1.0.0
+generation_config_file: generation.yaml
+generation_engine_version: 1.0.0
+run_live_generation_tests: false
+sales_engine_version: 1.0.0
+sales_config_file: sales.yaml
+allow_negative_stock: false
+sales_default_currency: EGP
+msc_high_confidence_threshold: 0.90
+msc_medium_confidence_threshold: 0.70
+sales_velocity_windows: [7, 30, 90]
+sales_slow_mover_days: 90
+sales_reorder_cover_days: 30
+run_live_msc_extraction_tests: false
+answer_bot_config_file: answer_bot.yaml
+answer_bot_version: 1.0.0
+run_live_messaging_tests: false
+messaging_privacy_mode: LOCAL_ONLY
+creator_import_column_mapping:
+  Name: display_name
+  Creator: display_name
+  Display Name: display_name
+  Creator UID: creator_uid
+  Country: country
+  Language: primary_language
+  Primary Language: primary_language
+  Category: category
+  Notes: notes
+  Priority: priority
+  Active: active
+  TikTok: tiktok_username
+  TikTok Username: tiktok_username
+  Instagram: instagram_username
+  Instagram Username: instagram_username
+  YouTube: youtube_handle
+  YouTube Handle: youtube_handle
+  Telegram: telegram_username
+  Facebook: facebook_username
+  X: x_username
+  Website: website_profile_url
+  Platform: platform
+  Username: username
+  Handle: username
+  Profile URL: profile_url
+  Platform User ID: platform_user_id

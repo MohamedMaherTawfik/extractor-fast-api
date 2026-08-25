@@ -1,0 +1,33 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+logs/
+data/cache/
+data/temp/
+data/imports/
+data/raw/
+data/media/
+database/*.db
+database/*.db-shm
+database/*.db-wal
+.DS_Store
+Thumbs.db
+
+# Python tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+node_modules/
+frontend/src-tauri/target/
+.npm-cache/
+*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
+
+# Editors
+.idea/
+.vscode/

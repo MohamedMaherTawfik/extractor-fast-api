@@ -1,0 +1,25 @@
+{
+  "project": "EMY_PRIVATE_AI_OS",
+  "stage": "answer_bot",
+  "environment_ready": true,
+  "active_task": null,
+  "completed_modules": [
+    "bootstrap",
+    "core_architecture",
+    "database_creator_master",
+    "platform_collector_core",
+    "universal_content_analysis_engine",
+    "pattern_and_recipe_engine",
+    "rules_engine",
+    "generation_engine",
+    "product_sales_engine",
+    "answer_bot"
+  ],
+  "next_task": "desktop_ui",
+  "known_issues": [
+    "MASTER_CONTROL_FILE_NOT_FOUND: no EMY Creative Generation Master OS workbook is currently present; the preview/import interface is ready for a later project-relative file",
+    "FFMPEG_NOT_FOUND: video generation is shot-based and persisted, while final video assembly currently produces a safe manifest-only plan until an FFmpeg binary is configured",
+    "LIVE_MESSAGING_CONNECTORS_NOT_CONFIGURED: only deterministic mock and local website-chat adapters are registered; real provider credentials, permissions, webhooks, and live tests remain future integration work",
+    "WINDOWS_IANA_TZDATA_NOT_BUNDLED: follow-up quiet hours use the configured fixed UTC offset until an IANA timezone data package is explicitly added"
+  ]
+}

@@ -1,0 +1,14 @@
+version: 1.0.0
+priority_tiers:
+  safety_rights_hard: 500
+  factual_identity: 400
+  accessibility_technical_platform: 300
+  brand: 200
+  recipe: 100
+  creative_preference: 0
+default_confidence_threshold: 0.80
+stale_policy_days: 90
+same_priority_hard_conflict: human_review
+cache_enabled: true
+cache_max_entries: 512
+max_rules_per_evaluation: 10000

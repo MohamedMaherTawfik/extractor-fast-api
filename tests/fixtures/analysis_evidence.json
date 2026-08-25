@@ -1,0 +1,162 @@
+{
+  "analysis_observations": {
+    "hook_type": {
+      "value": "question",
+      "confidence": 0.94,
+      "evidence": "Verbatim opening question between 0ms and 900ms",
+      "source": "video+transcript",
+      "start_ms": 0,
+      "end_ms": 900,
+      "target_ref": "seg_hook"
+    },
+    "shot_size": {
+      "value": "close_up",
+      "confidence": 0.91,
+      "evidence": "Subject face occupies the central frame",
+      "source": "vision",
+      "start_ms": 0,
+      "end_ms": 1200,
+      "target_ref": "shot_1"
+    },
+    "dominant_colors": {
+      "value": ["#112233", "#EEDDCC"],
+      "confidence": 0.89,
+      "evidence": "Sampled frame palette",
+      "source": "vision"
+    },
+    "audio_energy": {
+      "value": 0.72,
+      "confidence": 0.9,
+      "evidence": "Normalized observed RMS window",
+      "source": "audio",
+      "start_ms": 0,
+      "end_ms": 1500,
+      "target_ref": "audio_1"
+    },
+    "spoken_text": {
+      "value": "Do you need a faster workflow?",
+      "confidence": 0.96,
+      "evidence": "Timestamped transcript event",
+      "source": "speech",
+      "start_ms": 100,
+      "end_ms": 1100,
+      "target_ref": "text_speech"
+    },
+    "cta_type": {
+      "value": "learn_more",
+      "confidence": 0.88,
+      "evidence": "Visible and spoken learn more instruction",
+      "source": "copy+ocr",
+      "start_ms": 3100,
+      "end_ms": 3900,
+      "target_ref": "text_ocr"
+    },
+    "need_state": {
+      "value": "explicit_goal",
+      "confidence": 0.42,
+      "evidence": "Explicit statement about a faster workflow",
+      "source": "transcript"
+    },
+    "main_topic": {
+      "value": "workflow automation",
+      "confidence": 0.87,
+      "evidence": "Repeated exact terms in transcript and caption",
+      "source": "text"
+    }
+  },
+  "analysis_timeline": {
+    "segments": [
+      {
+        "ref": "scene_1",
+        "level": "scene",
+        "kind": "scene",
+        "label": "opening",
+        "start_ms": 0,
+        "end_ms": 4000,
+        "sequence_order": 0
+      },
+      {
+        "ref": "seg_hook",
+        "parent_ref": "scene_1",
+        "level": "segment",
+        "kind": "hook",
+        "label": "question",
+        "start_ms": 0,
+        "end_ms": 1200,
+        "sequence_order": 0
+      }
+    ],
+    "shots": [
+      {
+        "ref": "shot_1",
+        "segment_ref": "seg_hook",
+        "start_ms": 0,
+        "end_ms": 1200,
+        "sequence_order": 0,
+        "shot_size": "close_up",
+        "camera_angle": "eye_level",
+        "cut_type": "hard_cut"
+      },
+      {
+        "ref": "shot_2",
+        "segment_ref": "scene_1",
+        "start_ms": 1200,
+        "end_ms": 4000,
+        "sequence_order": 1,
+        "shot_size": "medium",
+        "camera_movement": "static",
+        "transition": "cut"
+      }
+    ],
+    "visual_events": [
+      {
+        "ref": "visual_1",
+        "event_type": "product_reveal",
+        "segment_ref": "scene_1",
+        "shot_ref": "shot_2",
+        "start_ms": 1500,
+        "end_ms": 2100,
+        "confidence": 0.93,
+        "evidence": "Product becomes visible",
+        "source": "vision"
+      }
+    ],
+    "audio_events": [
+      {
+        "ref": "audio_1",
+        "event_type": "speech",
+        "segment_ref": "seg_hook",
+        "start_ms": 100,
+        "end_ms": 1100,
+        "confidence": 0.97,
+        "evidence": "Speech activity window",
+        "source": "audio"
+      }
+    ],
+    "text_events": [
+      {
+        "ref": "text_speech",
+        "event_type": "transcript",
+        "segment_ref": "seg_hook",
+        "text": "Do you need a faster workflow?",
+        "start_ms": 100,
+        "end_ms": 1100,
+        "confidence": 0.96,
+        "evidence": "Speech transcript",
+        "source": "speech"
+      },
+      {
+        "ref": "text_ocr",
+        "event_type": "ocr",
+        "shot_ref": "shot_2",
+        "text": "Learn more",
+        "start_ms": 3100,
+        "end_ms": 3900,
+        "bounding_box": {"x": 0.6, "y": 0.8, "width": 0.3, "height": 0.1},
+        "confidence": 0.92,
+        "evidence": "Visible text region",
+        "source": "ocr"
+      }
+    ]
+  }
+}

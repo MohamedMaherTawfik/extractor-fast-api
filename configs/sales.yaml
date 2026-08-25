@@ -1,0 +1,18 @@
+currency: EGP
+money_precision: 2
+quantity_precision: 4
+allow_negative_stock: false
+payment_methods: [CASH, BANK_TRANSFER, INSTAPAY, MOBILE_WALLET, CARD, COD, CHEQUE, OTHER]
+aging_buckets:
+  - {name: CURRENT, min_days: 0, max_days: 0}
+  - {name: 1-30, min_days: 1, max_days: 30}
+  - {name: 31-60, min_days: 31, max_days: 60}
+  - {name: 61-90, min_days: 61, max_days: 90}
+  - {name: 90+, min_days: 91, max_days: null}
+velocity_windows_days: [7, 30, 90]
+slow_mover_days: 90
+reorder_cover_days: 30
+msc:
+  allowed_mime_types: [image/png, image/jpeg, application/pdf, text/csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet]
+  high_confidence_threshold: 0.90
+  medium_confidence_threshold: 0.70

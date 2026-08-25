@@ -1,0 +1,10 @@
+enabled: false
+availability: not_configured
+rate_limit_per_minute: 60
+timeout_seconds: 20
+max_retries: 3
+backoff_initial_seconds: 1
+backoff_max_seconds: 30
+download_media: false
+max_items_per_run: 500
+preserve_raw: true

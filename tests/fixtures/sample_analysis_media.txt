@@ -1,0 +1,1 @@
+small deterministic media fixture used only for streaming hash tests
