@@ -1,6 +1,6 @@
 # EMY PRIVATE AI OS
 
-A local-first, private-first, portable, and modular AI operating-system project. The current backend covers Creator/Content collection and analysis, Pattern/Recipe, Rules, multimodal Generation, Product/Sales, and the Answer Bot/Customer Service workflow over an Alembic-versioned SQLAlchemy/SQLite core.
+A local-first, private-first, portable, and modular AI operating-system project. The current backend covers Creator/Content collection and analysis, Pattern/Recipe, Rules, multimodal Generation, Product/Sales, Answer Bot/Customer Service, and governed business-lead acquisition over an Alembic-versioned SQLAlchemy/SQLite core.
 
 ## Windows Setup
 
@@ -65,7 +65,7 @@ Database upgrades run automatically at backend startup. They can also be checked
 
 ## Architecture
 
-See docs/ARCHITECTURE.md. Real platform and messaging connectors, publishing, authentication, the desktop UI, and the portable production runtime remain intentionally unimplemented or unconfigured.
+See docs/ARCHITECTURE.md. Paid lead providers and real platform/messaging connectors remain intentionally unconfigured; publishing, authentication, and the portable production runtime remain unimplemented. The Windows desktop UI and the open-data Lead Acquisition workspace are implemented and natively verified.
 
 ## Pattern and Recipe Engine
 

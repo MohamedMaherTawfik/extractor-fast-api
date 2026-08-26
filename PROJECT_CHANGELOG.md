@@ -1,5 +1,19 @@
 # Project Changelog
 
+## 2026-08-26 — Lead Data Acquisition Engine 1.0.0 — AUDITED COMPLETE
+
+- Resumed at the exact interruption point: the Lead implementation had been committed after a backend regression stopped at 120 passed / 1 stale operator-capability assertion, before live source and native desktop proof. Existing working components were retained.
+- Verified Alembic revision `0010_lead_acquisition`, all eight Lead tables, module imports, main-router endpoints, project-venv dependencies, source/credential status, API-backed React behavior, and absence of an external workbook.
+- Completed only missing safety behavior: explicit HTTP 429 evidence, `WAITING_RATE_LIMIT` run/job/source state, checkpoint-preserving operator resume, and a bounded OSM Overpass path while retaining reusable Geofabrik PBF support.
+- Live Overture Cairo/pharmacy smoke completed: 915 rows scanned, 10 real records returned, 10 unique canonical leads saved, zero errors, release `2026-08-19.0`.
+- Live OSM Cairo/pharmacy smoke completed through a bounded Overpass BBOX: 10 real records returned and 10 unique canonical leads saved, with zero errors. No full Egypt PBF or nationwide plan was run.
+- API verification found 20 persisted canonical leads / 20 source records, server pagination and filters, source/dedupe/score/provenance detail, and 20-row CSV (7,302 bytes), XLSX (9,190 bytes), and Parquet (12,227 bytes) exports.
+- No HTTP 429, quota, daily-limit, billing, or credits-exhausted evidence was found. Google Places and Foursquare credentials are not configured; their adapters are interface-only and disabled, and no paid API credit was used.
+- The optional control workbook was not found. Validated YAML fallback counts are 78 distinct keywords, 37 segments, and 27 governorates; a bounded Overture/Cairo/pharmacies dry run planned one job. The native default nationwide/Tier-1 dry run planned 514 jobs without collecting.
+- Native Tauri/WebView2 verification opened Data Acquisition, New Run, Sources, Dry Run, Runs/progress, Results, and a real lead detail/provenance drawer. The explicit Start controls were present; the nationwide Start action was not clicked.
+- Tests: all 126 backend tests passed; five frontend files / 10 tests passed; the production frontend build passed; the native window compiled, launched, stayed responsive, and shut down cleanly.
+- Project state now marks `lead_data_acquisition_engine` complete. Portable Production Runtime remains next and was not started.
+
 ## 2026-08-25 — Desktop UI / Operator Control Center 1.0.0 — COMPLETE
 
 - Task ID: `prompt_8b_desktop_ui_resume`; resumed the existing Desktop UI and removed only its Windows native-toolchain blocker. Portable Production Runtime / Prompt 9 was not started.

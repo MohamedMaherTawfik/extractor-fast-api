@@ -16,7 +16,7 @@ Only harmless preferences—language, theme, and sidebar state—are stored in b
 
 ## Discovery, API, and realtime strategy
 
-Startup calls `GET /system/capabilities`. This returns actual module versions and availability, including a disabled Lead Engine and Publishing feature. Navigation hides unavailable domain modules. The thin operator endpoints provide:
+Startup calls `GET /system/capabilities`. This returns actual module versions and availability, including the available Lead Engine and unavailable Publishing feature. Navigation hides unavailable domain modules. The thin operator endpoints provide:
 
 - `/system/health-detail` for backend, database, storage, queue, generation, messaging, and MSC status;
 - `/system/dashboard` and `/system/notifications` for live operational counts and alerts;
@@ -30,7 +30,7 @@ The typed client uses a configurable `VITE_API_URL`, timeout, normalized errors,
 
 The application shell includes a collapsible sidebar, top command/search bar, system connection state, user/mode indicator, and notification center. `Ctrl+K` opens global search and commands.
 
-Routes cover Home, Content, Intelligence, Patterns/Recipes, Rules, Generation, Assets, Content Calendar, Products, Customers, Sales, Inventory, Suppliers/Purchases, MSC Intake, Conversations, Customer Service, Approvals, Analytics, Audit, and Settings. Leads are hidden because the backend reports that module unavailable.
+Routes cover Home, Content, Intelligence, Patterns/Recipes, Rules, Generation, Assets, Content Calendar, Products, Customers, Sales, Inventory, Suppliers/Purchases, MSC Intake, Conversations, Customer Service, Approvals, Analytics, Audit, Settings, and Data Acquisition. The Lead workspace reads only from the Lead API and provides source status, safe run setup/dry-run planning, durable progress and controls, server-paginated filters, provenance detail, and bounded CSV/XLSX/Parquet export.
 
 The Home dashboard contains backend-derived queue, content, approval, sales, order, MSC, conversation, and handoff metrics. All list workspaces are server-paginated and use shared loading, empty, error, table, status, and detail-drawer components. No production sample rows or invented charts are rendered.
 
@@ -50,7 +50,7 @@ The Tauri 2 configuration disables bundling for this development phase. Its capa
 
 WebView2 151 is present. Rust 1.98.0 and Cargo 1.98.0 use the stable `x86_64-pc-windows-msvc` toolchain. Visual Studio Build Tools 2022 17.14.39 supplies MSVC v143 14.44, CMake 3.31.6, and Windows SDK 10.0.26100.0. Native `tauri dev` and optimized `tauri build` both compile successfully on this host.
 
-Native verification used the real Tauri WebView2 window with the local FastAPI backend. It covered the app shell, backend connection, Home, Products, Customers, Sales, Inventory, MSC, Generation, Conversations, Approvals, and Settings. Seeded local-only data verified list/detail drawers, first conversation selection, held-draft approval, preservation of the enabled Send action, mock-channel sending, READY generation flow without execution, and NOT_READY generation blocking. This is a documented native smoke/E2E verification; the repository does not add a separately maintained Windows UI automation harness in this phase.
+Native verification used the real Tauri WebView2 window with the local FastAPI backend. It covered the app shell, backend connection, core operational routes, and Data Acquisition. The Lead audit opened New Run, returned a 514-job nationwide dry-run plan without collection, showed two completed bounded live source runs, rendered 20 real Cairo pharmacy leads, and opened canonical/source/provenance detail. This is a documented native smoke/E2E verification; the repository does not add a separately maintained Windows UI automation harness in this phase.
 
 ## Development and testing
 
@@ -86,4 +86,4 @@ cd ..
 .\.venv\Scripts\python.exe -m pytest
 ~~~
 
-Tests mock only the local backend boundary and cover the shell, feature gate, navigation, command palette, RTL/LTR, status/table components, loading/offline behavior, and READY/BLOCKED generation contracts. No live external provider is called. Portable Python, installers, embedded databases, model/media bundling, signing, and updates remain Prompt 9 work.
+Frontend tests mock only the local backend boundary and cover the shell, feature gate, navigation, command palette, RTL/LTR, status/table components, loading/offline behavior, READY/BLOCKED generation contracts, and the Lead workspace. The separate bounded audit called real Overture and OSM endpoints. Portable Python, installers, embedded databases, model/media bundling, signing, and updates remain Prompt 9 work.

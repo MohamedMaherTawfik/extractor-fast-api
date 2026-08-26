@@ -8,6 +8,7 @@ data/temp/
 data/imports/
 data/raw/
 data/media/
+data/lead_acquisition/
 database/*.db
 database/*.db-shm
 database/*.db-wal
@@ -27,6 +28,7 @@ frontend/src-tauri/target/
 *.tsbuildinfo
 frontend/vite.config.js
 frontend/vite.config.d.ts
+.tmp/
 
 # Editors
 .idea/

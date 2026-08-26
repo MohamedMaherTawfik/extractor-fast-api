@@ -17,6 +17,46 @@ from backend.leads.normalization import RawLeadRecord
 EmitRecord = Callable[[RawLeadRecord, int], bool]
 
 
+class SourceRateLimitError(RuntimeError):
+    """Preserve provider rate evidence without triggering an aggressive retry."""
+
+    def __init__(
+        self,
+        source_uid: str,
+        provider_message: str,
+        *,
+        status_code: int = 429,
+        retry_after: str | None = None,
+        reset_time: str | None = None,
+    ) -> None:
+        super().__init__(provider_message)
+        self.source_uid = source_uid
+        self.status_code = status_code
+        self.provider_message = provider_message[:1000]
+        self.retry_after = retry_after
+        self.reset_time = reset_time
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "source": self.source_uid,
+            "http_code": self.status_code,
+            "provider_message": self.provider_message,
+            "retry_after": self.retry_after,
+            "reset_time": self.reset_time or "RESET_TIME_UNKNOWN",
+        }
+
+
+def _raise_for_source_status(response: httpx.Response, source_uid: str) -> None:
+    if response.status_code == 429:
+        raise SourceRateLimitError(
+            source_uid,
+            response.text[:1000] or "Too many requests",
+            retry_after=response.headers.get("Retry-After"),
+            reset_time=response.headers.get("X-RateLimit-Reset") or response.headers.get("RateLimit-Reset"),
+        )
+    response.raise_for_status()
+
+
 @dataclass(slots=True)
 class CollectionContext:
     source_uid: str
@@ -49,7 +89,7 @@ class OvertureCollector(BaseLeadCollector):
     def discover_latest_release(self) -> str:
         timeout = float(self.catalog.execution.get("overture_timeout_seconds", 90))
         response = httpx.get(self.catalog_url, timeout=timeout, follow_redirects=True)
-        response.raise_for_status()
+        _raise_for_source_status(response, "SRC_OVERTURE")
         release = response.json().get("latest")
         if not release:
             raise RuntimeError("Overture STAC catalog did not advertise a latest release")
@@ -171,7 +211,7 @@ class _StopCollection(Exception):
 class OSMGeofabrikCollector(BaseLeadCollector):
     """Streaming Egypt PBF reader with resumable HTTP download and tag filtering."""
 
-    RELEVANT = {"shop", "amenity", "healthcare", "office", "craft", "beauty", "hairdresser", "pharmacy", "spa"}
+    RELEVANT = {"shop", "amenity", "healthcare", "office", "craft", "beauty", "hairdresser", "pharmacy", "spa", "leisure"}
 
     def __init__(self, catalog: LeadCatalog | None = None) -> None:
         self.catalog = catalog or get_lead_catalog()
@@ -186,7 +226,7 @@ class OSMGeofabrikCollector(BaseLeadCollector):
         start = partial.stat().st_size if partial.exists() else 0
         headers = {"Range": f"bytes={start}-"} if start else {}
         with httpx.stream("GET", url, headers=headers, timeout=120, follow_redirects=True) as response:
-            response.raise_for_status()
+            _raise_for_source_status(response, "SRC_OSM_GEOFABRIK")
             mode = "ab" if start and response.status_code == 206 else "wb"
             with partial.open(mode) as stream:
                 for chunk in response.iter_bytes(1024 * 1024):
@@ -195,6 +235,8 @@ class OSMGeofabrikCollector(BaseLeadCollector):
         return self.extract_path
 
     def collect(self, context: CollectionContext, emit: EmitRecord) -> dict[str, Any]:
+        if context.options.get("osm_mode") == "overpass":
+            return self._collect_overpass(context, emit)
         try:
             import osmium
         except ImportError as exc:  # pragma: no cover - installation contract
@@ -248,6 +290,71 @@ class OSMGeofabrikCollector(BaseLeadCollector):
         except _StopCollection:
             pass
         return {"release": extract.name, "scanned": handler.scanned, "emitted": handler.emitted, "extract": paths.relative(extract).as_posix()}
+
+    def _collect_overpass(self, context: CollectionContext, emit: EmitRecord) -> dict[str, Any]:
+        if not context.tile or not context.tile.get("bbox"):
+            raise ValueError("Bounded OSM live collection requires a bbox tile")
+        west, south, east, north = (float(value) for value in context.tile["bbox"])
+        bbox = f"{south},{west},{north},{east}"
+        filters = self._overpass_filters(context.segment_ids)
+        statements = "".join(f'nwr{item}({bbox});' for item in filters)
+        query = f"[out:json][timeout:60];({statements});out center tags;"
+        response = httpx.post(
+            str(self.catalog.execution["overpass_url"]),
+            data={"data": query},
+            headers={"User-Agent": "EMY-Private-AI-OS/1.0 lead-audit"},
+            timeout=90,
+            follow_redirects=True,
+        )
+        _raise_for_source_status(response, "SRC_OSM_GEOFABRIK")
+        payload = response.json()
+        release = str((payload.get("osm3s") or {}).get("timestamp_osm_base") or "overpass-current")
+        skip = int(context.checkpoint.get("raw_position", 0))
+        scanned = 0
+        emitted = 0
+        allowed = set(context.segment_ids)
+        for element in payload.get("elements", []):
+            tags = dict(element.get("tags") or {})
+            if not tags.get("name"):
+                continue
+            scanned += 1
+            if scanned <= skip:
+                continue
+            category = self._category(tags)
+            if allowed and category not in allowed and not self._keyword_match(tags, context.keywords):
+                if not emit(None, scanned):  # type: ignore[arg-type]
+                    break
+                continue
+            center = element.get("center") or element
+            record = self._to_record(
+                str(element.get("type", "object")),
+                int(element.get("id", 0)),
+                tags,
+                center.get("lon"),
+                center.get("lat"),
+                context.governorate,
+            )
+            record.source_version = release
+            emitted += 1
+            if not emit(record, scanned):
+                break
+            if context.max_records and emitted >= context.max_records:
+                break
+        return {"release": release, "scanned": scanned, "emitted": emitted, "mode": "overpass_bbox"}
+
+    @staticmethod
+    def _overpass_filters(segment_ids: list[str]) -> list[str]:
+        selected = set(segment_ids)
+        filters: list[str] = []
+        if "pharmacies" in selected:
+            filters.extend(('["amenity"="pharmacy"]', '["shop"="chemist"]'))
+        if selected.intersection({"ladies_salons", "men_barbers", "unisex_salons", "beauty_centers"}):
+            filters.extend(('["shop"="hairdresser"]', '["shop"="beauty"]'))
+        if selected.intersection({"spas", "medical_spas"}):
+            filters.append('["leisure"="spa"]')
+        if not filters:
+            filters.extend(f'["{key}"]' for key in ("shop", "amenity", "healthcare", "office", "craft"))
+        return list(dict.fromkeys(filters))
 
     def _category(self, tags: dict[str, str]) -> str | None:
         values = [tags.get(key, "") for key in self.RELEVANT]
@@ -313,4 +420,3 @@ class WebsiteEnrichmentAdapter(ConfigGatedAdapter):
 
 class OfficialRegistryAdapter(ConfigGatedAdapter):
     pass
-

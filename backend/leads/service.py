@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from backend.core.exceptions import NotFoundError
 from backend.db.base import utc_now
 from backend.db.models.leads import Lead, LeadJob, LeadRun
-from backend.leads.collectors import CollectionContext
+from backend.leads.collectors import CollectionContext, SourceRateLimitError
 from backend.leads.config import LeadCatalog, get_lead_catalog
 from backend.leads.geography import GeographyService
 from backend.leads.normalization import LeadNormalizer, RawLeadRecord
@@ -37,6 +37,7 @@ class LeadAcquisitionService:
         self.workbook = LeadWorkbookService(session, self.catalog)
 
     def sync_sources(self) -> list[Any]:
+        existing_by_uid = {item.source_uid: item for item in self.repository.list_sources()}
         rows = []
         for descriptor in self.sources.describe_all():
             config = descriptor.config
@@ -57,10 +58,13 @@ class LeadAcquisitionService:
                 "status": descriptor.status,
                 "status_detail": descriptor.status_detail,
             }
-            existing = next((item for item in self.repository.list_sources() if item.source_uid == config["source_uid"]), None)
+            existing = existing_by_uid.get(config["source_uid"])
             if existing:
                 values["last_run"] = existing.last_run
                 values["last_success"] = existing.last_success
+                if existing.status == "RATE_LIMITED":
+                    values["status"] = existing.status
+                    values["status_detail"] = existing.status_detail
             rows.append(self.repository.upsert_source(values))
         return rows
 
@@ -105,7 +109,7 @@ class LeadAcquisitionService:
         jobs: list[dict[str, Any]] = []
         bbox_override = request.source_options.get("bbox_override")
         for source_uid in enabled_sources:
-            if source_uid == "SRC_OSM_GEOFABRIK":
+            if source_uid == "SRC_OSM_GEOFABRIK" and not (bbox_override and request.source_options.get("osm_mode") == "overpass"):
                 jobs.append({"source_uid": source_uid, "governorate": None, "tile": {"tile_id": "egypt-extract", "bbox": self.catalog.country["bbox"], "polygon": self.catalog.country["polygon"]}})
                 continue
             source_tiles = all_tiles
@@ -179,11 +183,11 @@ class LeadAcquisitionService:
         options = run.config_snapshot.get("request", {}).get("source_options", {})
         for job in jobs:
             self.session.refresh(run)
-            if run.status in {"PAUSED", "CANCELLED"}:
+            if run.status in {"PAUSED", "CANCELLED", "WAITING_RATE_LIMIT"}:
                 break
             self._execute_job(run, job, max_records=max_records, options=options)
         self.session.refresh(run)
-        if run.status not in {"PAUSED", "CANCELLED"}:
+        if run.status not in {"PAUSED", "CANCELLED", "WAITING_RATE_LIMIT"}:
             states = [job.status for job in run.jobs]
             if states and all(state == "COMPLETED" for state in states):
                 run.status = "COMPLETED"
@@ -257,7 +261,30 @@ class LeadAcquisitionService:
                 job.status = "COMPLETED"
                 job.completed_at = utc_now()
                 self._touch_source(job.source_uid, success=True)
+        except SourceRateLimitError as exc:
+            evidence = exc.as_dict()
+            job.error = evidence["provider_message"]
+            job.status = "WAITING_RATE_LIMIT"
+            job.checkpoint = {**job.checkpoint, "rate_limit": evidence}
+            run.status = "WAITING_RATE_LIMIT"
+            self._mark_source_rate_limited(job.source_uid, evidence)
         except Exception as exc:
+            message = str(exc)
+            if any(marker in message.casefold() for marker in ("429", "too many requests", "rate limit", "quota exceeded", "slow down")):
+                evidence = {
+                    "source": job.source_uid,
+                    "http_code": 429 if "429" in message else None,
+                    "provider_message": message[:1000],
+                    "retry_after": None,
+                    "reset_time": "RESET_TIME_UNKNOWN",
+                }
+                job.error = evidence["provider_message"]
+                job.status = "WAITING_RATE_LIMIT"
+                job.checkpoint = {**job.checkpoint, "rate_limit": evidence}
+                run.status = "WAITING_RATE_LIMIT"
+                self._mark_source_rate_limited(job.source_uid, evidence)
+                self.session.commit()
+                return
             job.error = str(exc)[:2000]
             job.status = "PARTIAL" if job.found else "FAILED"
             job.completed_at = utc_now()
@@ -408,6 +435,19 @@ class LeadAcquisitionService:
                 source.last_run = utc_now()
                 if success:
                     source.last_success = utc_now()
+                    source.status = "READY"
+                    source.status_detail = None
+                break
+
+    def _mark_source_rate_limited(self, source_uid: str, evidence: dict[str, Any]) -> None:
+        for source in self.sync_sources():
+            if source.source_uid == source_uid:
+                source.status = "RATE_LIMITED"
+                source.status_detail = (
+                    f"HTTP {evidence.get('http_code') or 'UNKNOWN'}; "
+                    f"retry_after={evidence.get('retry_after') or 'UNKNOWN'}; "
+                    f"reset_time={evidence.get('reset_time') or 'RESET_TIME_UNKNOWN'}"
+                )
                 break
 
     def pause(self, run_uid: str) -> LeadRun:
@@ -420,10 +460,10 @@ class LeadAcquisitionService:
 
     def resume(self, run_uid: str) -> LeadRun:
         run = self._run(run_uid)
-        if run.status not in {"PAUSED", "PARTIAL", "FAILED"}:
+        if run.status not in {"PAUSED", "PARTIAL", "FAILED", "WAITING_RATE_LIMIT"}:
             raise ValueError(f"Run cannot be resumed from {run.status}")
         for job in run.jobs:
-            if job.status in {"PAUSED", "PARTIAL"}:
+            if job.status in {"PAUSED", "PARTIAL", "WAITING_RATE_LIMIT"}:
                 job.status = "PENDING"
         run.status = "PENDING"
         run.completed_at = None
@@ -517,4 +557,3 @@ class LeadAcquisitionService:
         completed = sum(1 for job in run.jobs if job.status == "COMPLETED") if run.jobs else 0
         result["progress_percent"] = round(completed * 100 / run.planned_jobs, 2) if run.planned_jobs else 0
         return result
-

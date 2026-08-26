@@ -15,9 +15,9 @@ Local-first, private-first, portable, modular, config-driven, and API-first.
 ## Current Stack
 
 - Windows
-- Python 3.14.3
+- Python 3.14.6
 - Project virtual environment in .venv
-- pip 26.2.1
+- pip 26.1.2
 - Git 2.53.0.windows.1
 - FastAPI 0.141.1
 - Uvicorn 0.52.3
@@ -106,6 +106,7 @@ Local-first, private-first, portable, modular, config-driven, and API-first.
 - Human handoff queues/summaries, agent edit audit, consent-aware follow-ups, opt-out/quiet-hours enforcement, and CRM signals
 - Reviewable telesales tasks and factual quote/order drafts that never post Product/Sales transactions
 - Native Windows Desktop UI / Operator Control Center with feature-discovered navigation, API-backed workspaces, Tauri security boundaries, RTL/LTR themes, generation gating, and conversation review/send workflows
+- Lead Data Acquisition Engine with governed source registry, Overture and OSM/Geofabrik collectors, resumable durable runs, deterministic normalization/deduplication/scoring, provenance, server-paginated results, and CSV/XLSX/Parquet export
 
 ## Important Paths
 
@@ -126,7 +127,7 @@ Local-first, private-first, portable, modular, config-driven, and API-first.
 
 ## Database Status
 
-SQLite is at Alembic revision 0009_answer_bot. In addition to the complete Analysis → DNA → Pattern → Recipe → Rules → Generation Contract and Product/Sales flows, it persists 27 Answer Bot tables covering normalized conversations/messages, channel/contact identity, state and understanding, response decisions, human handoff, outbound delivery, follow-ups/consent, knowledge/versioning, CRM/telesales, sales drafts, summaries, events, and webhook idempotency.
+SQLite is at Alembic revision `0010_lead_acquisition`. In addition to the existing application domains, it persists `lead_sources`, `lead_runs`, `lead_jobs`, `leads`, `lead_source_records`, `lead_dedupe_events`, `lead_control_imports`, and the deliberately separate consent-bearing `opt_in_leads` table.
 
 ## Current Version
 
@@ -134,15 +135,15 @@ SQLite is at Alembic revision 0009_answer_bot. In addition to the complete Analy
 
 ## Last Completed Work
 
-Completed and natively verified EMY Control Center 1.0.0 on Windows: installed the MSVC v143/Windows SDK/Rust prerequisites, compiled and launched the Tauri window, verified backend-connected navigation and operational workflows in the real WebView2 surface, passed frontend and backend regressions, and produced the optimized native executable with development bundling intentionally disabled.
+Completed and audited Lead Data Acquisition Engine 1.0.0. Real bounded Cairo pharmacy collection succeeded through both Overture and OSM, persisted 20 canonical leads with provenance, exposed them through paginated APIs and all three exports, and rendered them in the native Tauri Data Acquisition workspace. The nationwide action was dry-run only and was not executed.
 
 ## Current Blockers
 
-No Desktop UI execution blocker. Live messaging connectors are intentionally not configured; only no-network mock and local website-chat adapters are registered. Follow-up quiet hours use a configured fixed UTC offset because Windows does not bundle IANA timezone data. No sales workbook is currently present, and the earlier `MASTER_CONTROL_FILE_NOT_FOUND` and `FFMPEG_NOT_FOUND` limitations remain unchanged. Real messaging, MSC, generation, or conversation providers require explicit future configuration, credentials, permissions, and dedicated live tests.
+No Lead Engine or Desktop UI execution blocker. The optional Lead control workbook is absent, so the validated YAML catalog supplies 78 keywords, 37 segments, and 27 governorates. Google Places and Foursquare credentials are not configured and their adapters remain interface-only and disabled; website enrichment, registry verification, and licensed directory sources are also disabled. Existing messaging, timezone, master-control workbook, and FFmpeg limitations remain unchanged.
 
 ## Next Step
 
-Build the Portable Production Runtime next. Do not start it, installer engineering, signing, publishing, or live provider integrations implicitly from the completed Desktop UI task.
+Build the Portable Production Runtime next. Do not start it, a full-Egypt lead run, installer engineering, signing, publishing, or paid provider integrations implicitly from this completed audit.
 
 ## Non-negotiable Rules
 

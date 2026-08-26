@@ -59,6 +59,7 @@ SQLAlchemy provides the ORM boundary over SQLite. Alembic owns all schema creati
 - daily close, balanced accounting journals, approvals, business-event outbox, and sales audit ledger
 - messaging contacts/accounts, conversations, normalized messages/attachments/delivery events, state, intent/entities, response plans, decisions, handoffs, notes, edits, and audit events
 - follow-ups, purpose-specific consent, CRM signals, telesales tasks, quote/order drafts, versioned knowledge/templates/summaries, and webhook idempotency records
+- lead source registry, durable acquisition runs/jobs/checkpoints, canonical leads, source records/provenance, dedupe events, control-workbook imports, and separate consent-bearing opt-in leads
 
 Creator identity is never derived from a username, login, email address, or hashtag. A creator_uid remains stable while platform accounts can be added or changed.
 
@@ -101,8 +102,10 @@ CSV and XLSX files are copied into managed data/imports storage. Only their proj
 - BaseMessagingChannel and ChannelRegistry isolate normalized conversation processing from provider webhooks and outbound delivery; only no-network mock and local website-chat adapters are registered.
 - AnswerBotEngine coordinates contact resolution, multilingual intent/entity analysis, allow-listed read-only Product/Sales context, response planning/generation/validation, conservative auto-send, human handoff, follow-up, consent, and reviewable CRM/sales drafts.
 - ConversationModelProvider isolates local or future external language providers. The default deterministic provider is local, and LOCAL_ONLY mode prevents external selection.
+- LeadSourceRegistry reports each source independently and selects streaming collectors. Overture and OSM/Geofabrik are implemented and enabled without credentials; Google Places, Foursquare, website enrichment, official registry, and licensed-directory adapters remain explicitly gated or disabled.
+- LeadAcquisitionService plans tiled jobs, persists checkpoints and raw project-relative records, normalizes source payloads, performs deterministic multi-signal deduplication and scoring, and exposes server-paginated canonical results. HTTP 429 evidence is retained as `WAITING_RATE_LIMIT` without an automatic aggressive retry.
 
-No real platform API implementation, scraper, or live messaging connector is fabricated. No external or fine-tuned analysis, generation, or conversation model is configured: those implementations can replace provider interfaces later. Causal winner claims, publishing, and authentication remain unimplemented. The React operator surface is implemented, while native Tauri validation is blocked by the missing host MSVC/Windows SDK prerequisite. The Answer Bot never mutates Product/Sales source records and stops order drafts at sales review.
+No real platform API implementation, scraper, paid lead-provider implementation, or live messaging connector is fabricated. No external or fine-tuned analysis, generation, or conversation model is configured: those implementations can replace provider interfaces later. Causal winner claims, publishing, and authentication remain unimplemented. The React operator surface and native Tauri shell are implemented and verified. The Answer Bot never mutates Product/Sales source records and stops order drafts at sales review.
 
 ## Desktop Operator Surface
 
@@ -114,7 +117,21 @@ Tauri WebView / Vite development surface
     -> existing domain APIs, services, repositories, and SQLite
 ~~~
 
-The operator surface never computes business facts. `GET /system/capabilities` gates navigation, including unavailable Lead and Publishing features. Dashboard, search, notifications, health, safe settings, and server-paginated workspace endpoints expose real backend state without secrets. See `docs/DESKTOP_UI.md` for routes, security, RTL/LTR, testing, and the current native-build blocker.
+The operator surface never computes business facts. `GET /system/capabilities` gates navigation; Lead Acquisition is available while Publishing remains unavailable. Dashboard, search, notifications, health, safe settings, and server-paginated workspace endpoints expose real backend state without secrets. See `docs/DESKTOP_UI.md` for routes, security, RTL/LTR, and testing.
+
+## Lead Acquisition Flow
+
+~~~text
+Source registry + workbook/YAML controls
+    -> dry-run planner -> durable run and tiled jobs
+    -> Overture or OSM/Geofabrik collector
+    -> project-relative raw JSONL + checkpoint
+    -> normalization -> deterministic dedupe -> deterministic score
+    -> canonical lead + source provenance -> SQLite
+    -> paginated API/export -> native Data Acquisition workspace
+~~~
+
+The optional command workbook can supply Lead Segments, Keyword Master, Egypt Coverage, Source Registry, Query Matrix, and Run Config. If absent, the validated YAML catalog remains the explicit source of truth. Full-Egypt execution is operator initiated; audits use bounded BBOX samples only. See `docs/LEAD_DATA_ACQUISITION_ENGINE.md`.
 
 ## Collection Flow
 

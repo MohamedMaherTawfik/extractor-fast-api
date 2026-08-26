@@ -16,4 +16,5 @@
 - [x] Build Product/Sales Engine
 - [x] Build Answer Bot
 - [x] Build Desktop UI
+- [x] Build Lead Data Acquisition Engine
 - [ ] Build Portable Production Runtime

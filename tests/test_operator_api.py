@@ -3,7 +3,7 @@ def test_operator_capabilities_feature_gate_and_safe_settings(api_request):
     assert capabilities.status_code == 200
     modules = capabilities.json()["modules"]
     assert modules["answer_bot"]["enabled"] is True
-    assert modules["lead_engine"] == {"enabled": False, "status": "not_implemented"}
+    assert modules["lead_engine"] == {"enabled": True, "status": "available", "version": "1.0.0"}
     settings = api_request("GET", "/system/settings")
     assert settings.status_code == 200
     assert "secret" not in settings.text.casefold() and "api_key" not in settings.text.casefold()

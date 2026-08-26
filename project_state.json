@@ -1,6 +1,6 @@
 {
   "project": "EMY_PRIVATE_AI_OS",
-  "stage": "desktop_ui",
+  "stage": "lead_data_acquisition_engine",
   "environment_ready": true,
   "active_task": null,
   "completed_modules": [
@@ -14,10 +14,13 @@
     "generation_engine",
     "product_sales_engine",
     "answer_bot",
-    "desktop_ui"
+    "desktop_ui",
+    "lead_data_acquisition_engine"
   ],
   "next_task": "portable_production_runtime",
   "known_issues": [
+    "LEAD_CONTROL_WORKBOOK_NOT_FOUND: no EMY_Egypt_Lead_Acquisition_OS workbook is present; validated config defaults provide 78 keywords, 37 segments, and 27 governorates",
+    "PAID_LEAD_SOURCES_NOT_CONFIGURED: Google Places and Foursquare adapters are interface-only, disabled, and have no configured credentials; no paid API request was made",
     "MASTER_CONTROL_FILE_NOT_FOUND: no EMY Creative Generation Master OS workbook is currently present; the preview/import interface is ready for a later project-relative file",
     "FFMPEG_NOT_FOUND: video generation is shot-based and persisted, while final video assembly currently produces a safe manifest-only plan until an FFmpeg binary is configured",
     "LIVE_MESSAGING_CONNECTORS_NOT_CONFIGURED: only deterministic mock and local website-chat adapters are registered; real provider credentials, permissions, webhooks, and live tests remain future integration work",
