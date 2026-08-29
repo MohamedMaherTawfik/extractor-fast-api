@@ -71,21 +71,31 @@ class LeadAcquisitionService:
     def control_options(self) -> dict[str, Any]:
         workbook = self.workbook.preview()
         keywords = self.workbook.effective_keywords()
+        segments = self.workbook.effective_segments()
+        governorates = self.workbook.effective_governorates()
         return {
             "workbook": workbook,
-            "segments": self.catalog.segments,
+            "active_command_source": workbook["active_command_source"],
+            "query_matrix_rows": workbook.get("query_matrix_rows", 0),
+            "enabled_query_jobs": workbook.get("enabled_query_jobs", 0),
+            "segments": segments,
             "keywords": {"set": "approved", "count": len(keywords), "languages": sorted({str(item.get("language") or "unknown") for item in keywords})},
-            "governorates": self.geography.list_governorates(),
+            "governorates": governorates,
             "country": self.geography.country_boundary(),
             "run_modes": ["FULL_SCAN", "INCREMENTAL", "REFRESH_STALE", "ENRICH_ONLY", "VERIFY_ONLY"],
         }
 
     def plan(self, request: LeadRunRequest) -> tuple[LeadRunPlan, list[dict[str, Any]], list[str], list[str], list[str]]:
+        workbook = self.workbook.preview()
+        effective_segments = self.workbook.effective_segments()
+        effective_governorates = self.workbook.effective_governorates()
+        segment_by_id = {str(item["category_id"]): item for item in effective_segments}
+        governorate_by_id = {str(item["id"]): item for item in effective_governorates}
         source_ids = request.sources or [item["source_uid"] for item in self.catalog.sources if item.get("enabled")]
-        governorates = request.governorates or list(self.catalog.governorate_by_id)
-        segment_ids = request.segments or list(self.catalog.segment_by_id)
+        governorates = request.governorates or list(governorate_by_id)
+        segment_ids = request.segments or list(segment_by_id)
         unknown_sources = sorted(set(source_ids) - set(self.catalog.source_by_uid))
-        unknown_segments = sorted(set(segment_ids) - set(self.catalog.segment_by_id))
+        unknown_segments = sorted(set(segment_ids) - set(segment_by_id))
         if unknown_sources:
             raise ValueError(f"Unknown lead sources: {', '.join(unknown_sources)}")
         if unknown_segments:
@@ -120,7 +130,7 @@ class LeadAcquisitionService:
                 jobs.append({"source_uid": source_uid, "governorate": tile.governorate_id, "tile": tile.as_dict()})
         if not enabled_sources:
             warnings.append("No runnable sources are selected")
-        if self.workbook.preview()["available"] is False:
+        if workbook["status"] != "VALID":
             warnings.append(f"Command workbook not found; config defaults are active. Place it at {self.workbook.placement}")
         plan = LeadRunPlan(
             enabled_sources=enabled_sources,
@@ -152,7 +162,7 @@ class LeadAcquisitionService:
                 "dry_run": False,
                 "planned_jobs": len(jobs),
                 "warnings": plan.warnings,
-                "config_snapshot": {"catalog_version": self.catalog.version, "request": request.model_dump(mode="json")},
+                "config_snapshot": {"catalog_version": self.catalog.version, "active_command_source": self.workbook.preview()["active_command_source"], "request": request.model_dump(mode="json")},
             }
         )
         for job_plan in jobs:

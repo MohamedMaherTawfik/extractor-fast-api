@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from backend.db.session import get_db, session_scope
 from backend.leads.service import LeadAcquisitionService
-from backend.leads.storage import LeadExportService
+from backend.leads.storage import LeadExportService, ParquetExportUnavailableError
 from backend.repositories.lead_repository import LeadRepository
 from backend.schemas.leads import LeadExportRequest, LeadRunRequest
 
@@ -120,7 +120,10 @@ def retry_lead_run(run_uid: str, background: BackgroundTasks, session: DatabaseS
 
 @router.post("/leads/export")
 def export_leads(request: LeadExportRequest, session: DatabaseSession):
-    target = LeadExportService(LeadRepository(session)).export(request)
+    try:
+        target = LeadExportService(LeadRepository(session)).export(request)
+    except ParquetExportUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=exc.code) from exc
     media = {
         "csv": "text/csv",
         "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

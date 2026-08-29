@@ -8,10 +8,9 @@ from pathlib import Path
 from uuid import uuid4
 
 from openpyxl import Workbook
-from pyarrow import Table
-from pyarrow.parquet import ParquetWriter
 
 from backend.core.paths import paths
+from backend.core.runtime_capabilities import load_pyarrow_runtime
 from backend.db.models.leads import Lead
 from backend.repositories.lead_repository import LeadRepository
 from backend.schemas.leads import LeadExportRequest
@@ -26,6 +25,12 @@ EXPORT_COLUMNS = (
     "source_confidence", "fit_score", "fit_class", "lead_status",
     "dedupe_status", "chain_key",
 )
+
+
+class ParquetExportUnavailableError(RuntimeError):
+    """Raised when the optional Parquet runtime cannot be loaded safely."""
+
+    code = "PARQUET_EXPORT_UNAVAILABLE"
 
 
 class LeadRawStore:
@@ -91,16 +96,21 @@ class LeadExportService:
         workbook.save(target)
 
     def _parquet(self, target: Path, request: LeadExportRequest) -> None:
+        runtime = load_pyarrow_runtime()
+        if not runtime.available:
+            raise ParquetExportUnavailableError(ParquetExportUnavailableError.code)
+        table_type = runtime.table_type
+        parquet_writer_type = runtime.parquet_writer_type
         writer = None
         try:
             for rows in self._pages(request):
-                table = Table.from_pylist([self._row(row) for row in rows])
+                table = table_type.from_pylist([self._row(row) for row in rows])
                 if writer is None:
-                    writer = ParquetWriter(target, table.schema, compression="zstd")
+                    writer = parquet_writer_type(target, table.schema, compression="zstd")
                 writer.write_table(table)
             if writer is None:
-                table = Table.from_pylist([{column: None for column in EXPORT_COLUMNS}]).slice(0, 0)
-                writer = ParquetWriter(target, table.schema, compression="zstd")
+                table = table_type.from_pylist([{column: None for column in EXPORT_COLUMNS}]).slice(0, 0)
+                writer = parquet_writer_type(target, table.schema, compression="zstd")
         finally:
             if writer is not None:
                 writer.close()

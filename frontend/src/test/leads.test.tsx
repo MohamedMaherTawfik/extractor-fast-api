@@ -1,13 +1,76 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { normalizeLeadRunPlan } from "../api/leads";
 import { json, mockBackend, renderApp } from "./renderApp";
 
 const source = { source_uid: "SRC_OVERTURE", name: "Overture Maps Places", type: "BULK_DISCOVERY", enabled: true, configured: true, bulk_support: true, query_support: true, geo_support: "BBOX_STAC", credentials_required: false, freshness: "MONTHLY", terms_status: "REVIEWED_OPEN", storage_policy: "RAW_JSONL_AND_CANONICAL", rate_limit: "CLOUD_RANGE_READS", status: "READY" };
 const control = { workbook: { available: false, status: "NOT_FOUND_USING_CONFIG_DEFAULTS", placement: "data/imports/lead_control/EMY_Egypt_Lead_Acquisition_OS_v1.xlsx", sheet_counts: {}, errors: [] }, segments: [{ category_id: "pharmacies", name: "Pharmacies", tier: 1, buyer_type: "RETAILER", terms: ["pharmacy", "صيدلية"] }], keywords: { set: "approved", count: 2, languages: ["ar", "en"] }, governorates: [{ id: "cairo", name: "Cairo", name_ar: "القاهرة", bbox: [31.1, 29.8, 31.75, 30.35], density: "HIGH" }], country: { code: "EG", name: "Egypt", bbox: [], polygon: [] }, run_modes: ["FULL_SCAN", "INCREMENTAL"] };
-const run = { run_uid: "LRUN_1", name: "UI run", mode: "FULL_SCAN", sources: ["SRC_OVERTURE"], geography: {}, segments: ["pharmacies"], keywords: ["pharmacy"], status: "RUNNING", planned_jobs: 1, processed: 20, found: 4, unique_count: 3, duplicates: 1, errors: 0, current_source: "SRC_OVERTURE", current_governorate: "cairo", current_category: "MULTI_SEGMENT", warnings: [], progress_percent: 50, created_at: new Date().toISOString(), jobs: [{ job_uid: "LJOB_1", source_uid: "SRC_OVERTURE", governorate: "cairo", category: "MULTI_SEGMENT", status: "RUNNING", processed: 20, found: 4, unique_count: 3, duplicates: 1 }] };
+const run = { dry_run: false as const, run_uid: "LRUN_1", name: "UI run", mode: "FULL_SCAN", sources: ["SRC_OVERTURE"], geography: {}, segments: ["pharmacies"], keywords: ["pharmacy"], status: "RUNNING", planned_jobs: 1, processed: 20, found: 4, unique_count: 3, duplicates: 1, errors: 0, current_source: "SRC_OVERTURE", current_governorate: "cairo", current_category: "MULTI_SEGMENT", warnings: [], progress_percent: 50, created_at: new Date().toISOString(), jobs: [{ job_uid: "LJOB_1", source_uid: "SRC_OVERTURE", governorate: "cairo", category: "MULTI_SEGMENT", status: "RUNNING", processed: 20, found: 4, unique_count: 3, duplicates: 1 }] };
 const lead = { lead_uid: "LEAD_1", business: "Real Pharmacy", category: "pharmacies", fit_class: "A", governorate: "cairo", city: "Cairo", phone: "+201000000000", website: "https://example.test", source: "SRC_OVERTURE", score: 78, freshness: new Date().toISOString(), verification: "UNVERIFIED" };
 
 describe("data acquisition desktop", () => {
+  it("normalizes undefined and empty dry-run arrays", () => {
+    expect(normalizeLeadRunPlan({ dry_run: true, keyword_count: 431, planned_jobs: 11475 })).toEqual({
+      dry_run: true,
+      enabled_sources: [],
+      governorates: [],
+      segments: [],
+      keyword_count: 431,
+      planned_jobs: 11475,
+      missing_credentials: [],
+      warnings: [],
+    });
+    expect(normalizeLeadRunPlan({
+      dry_run: true,
+      enabled_sources: null,
+      governorates: [],
+      segments: null,
+      missing_credentials: [],
+      warnings: null,
+    })).toMatchObject({ enabled_sources: [], governorates: [], segments: [], missing_credentials: [], warnings: [] });
+  });
+
+  it("loads a workbook-backed New Run and safely renders a partial dry-run response", async () => {
+    const workbookControl = {
+      ...control,
+      active_command_source: "WORKBOOK",
+      query_matrix_rows: 11475,
+      enabled_query_jobs: 11475,
+      workbook: {
+        available: true,
+        status: "VALID",
+        active_command_source: "WORKBOOK",
+        filename: "EMY_Egypt_Lead_Acquisition_OS_v1.xlsx",
+        placement: "data/imports/lead_control/EMY_Egypt_Lead_Acquisition_OS_v1.xlsx",
+        sheet_counts: { "Keyword Master": 431, "Lead Segments": 50, "Egypt Coverage": 27, "Query Matrix": 11475 },
+        query_matrix_rows: 11475,
+        enabled_query_jobs: 11475,
+        errors: [],
+      },
+      keywords: { set: "approved", count: 431, languages: ["AR", "EN"] },
+      segments: Array.from({ length: 50 }, (_, index) => ({ category_id: `segment_${index}`, name: `Segment ${index}`, tier: 1, buyer_type: "RETAILER", terms: [] })),
+      governorates: Array.from({ length: 27 }, (_, index) => ({ id: `gov_${index}`, name: `Governorate ${index}`, name_ar: `Governorate ${index}`, bbox: [], density: "HIGH" })),
+    };
+    mockBackend((url, init) => {
+      if (url.includes("/lead-sources")) return json([source]);
+      if (url.includes("/lead-control")) return json(workbookControl);
+      if (url.endsWith("/lead-runs") && init?.method === "POST") return json({ dry_run: true, keyword_count: 431, planned_jobs: 11475 }, 201);
+      if (url.includes("/lead-runs")) return json({ items: [], total: 0, offset: 0, limit: 25 });
+    });
+    renderApp("/data-acquisition");
+    const user = userEvent.setup();
+    expect(await screen.findByText("Active command source: WORKBOOK")).toBeInTheDocument();
+    expect(screen.getByText("Approved keywords").parentElement).toHaveTextContent("Approved keywords431");
+    expect(screen.getByText("Segments").parentElement).toHaveTextContent("Segments50");
+    expect(screen.getByText("Governorates").parentElement).toHaveTextContent("Governorates27");
+    expect(screen.getByText("Query jobs").parentElement).toHaveTextContent("Query jobs11475");
+    await user.click(screen.getByRole("tab", { name: "New Run" }));
+    expect(await screen.findByRole("heading", { name: "New acquisition run" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Dry Run" }));
+    expect(await screen.findByText("Missing credentials")).toBeInTheDocument();
+    expect(screen.getByText("None")).toBeInTheDocument();
+  });
+
   it("preflights a new run, starts it, and exposes progress controls", async () => {
     mockBackend((url, init) => {
       if (url.includes("/lead-stats")) return json({ total_leads: 3, classes: { "A+": 1, A: 2, B: 0, C: 0 }, active_runs: 1, sources: 1, errors: 0 });

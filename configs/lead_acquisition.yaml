@@ -8,6 +8,13 @@ workbook:
   directory: data/imports/lead_control
   patterns: ["EMY_Egypt_Lead_Acquisition_OS_v*.xlsx"]
   required_sheets: ["Lead Segments", "Keyword Master", "Egypt Coverage", "Source Registry", "Query Matrix", "Run Config"]
+  sheet_aliases:
+    Lead Segments: 10_Lead_Segments
+    Keyword Master: 11_Keyword_Master
+    Egypt Coverage: 12_Egypt_Coverage
+    Source Registry: 13_Source_Registry
+    Query Matrix: 14_Query_Matrix
+    Run Config: 19_Run_Config
 execution:
   raw_batch_size: 500
   default_result_limit: 50

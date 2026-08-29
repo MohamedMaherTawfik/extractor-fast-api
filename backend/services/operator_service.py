@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from backend.answer_bot.channels import ChannelRegistry
 from backend.core.config import get_settings
 from backend.core.exceptions import NotFoundError
+from backend.core.runtime_capabilities import data_runtime_capabilities
 from backend.repositories.operator_repository import OperatorRepository, WORKSPACES
 
 
@@ -14,6 +15,7 @@ class OperatorService:
     def __init__(self, session: Session) -> None: self.repository = OperatorRepository(session); self.settings = get_settings()
 
     def capabilities(self) -> dict:
+        data_runtime = data_runtime_capabilities()
         return {
             "app": {"name": self.settings.app_name, "version": self.settings.version, "environment": self.settings.environment},
             "modules": {
@@ -27,6 +29,7 @@ class OperatorService:
                 "answer_bot": {"enabled": True, "version": self.settings.answer_bot_version},
                 "content_calendar": {"enabled": True, "version": "ui-planning-1.0.0", "mode": "planning_read_only"},
                 "lead_engine": {"enabled": True, "status": "available", "version": self.settings.lead_acquisition_version},
+                "parquet_export": {"enabled": data_runtime["parquet"]["available"], "status": data_runtime["parquet"]["status"]},
                 "publishing": {"enabled": False, "status": "not_implemented"},
             },
             "features": {name.replace("-", "_") + "_enabled": True for name in WORKSPACES},
@@ -53,4 +56,5 @@ class OperatorService:
             "privacy": {"messaging": self.settings.messaging_privacy_mode, "live_generation_tests": self.settings.run_live_generation_tests, "live_messaging_tests": self.settings.run_live_messaging_tests, "live_msc_tests": self.settings.run_live_msc_extraction_tests},
             "versions": {"app": self.settings.version, "generation": self.settings.generation_engine_version, "sales": self.settings.sales_engine_version, "answer_bot": self.settings.answer_bot_version, "lead_acquisition": self.settings.lead_acquisition_version},
             "channels": ChannelRegistry().status(),
+            "data_runtime": data_runtime_capabilities(),
         }

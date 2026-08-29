@@ -6,7 +6,10 @@ export type LeadSource = {
 };
 
 export type LeadControl = {
-  workbook: { available: boolean; status: string; placement: string; filename?: string; sheet_counts: Record<string, number>; errors: string[] };
+  workbook: { available: boolean; status: string; active_command_source: string; placement: string; filename?: string; sheet_counts: Record<string, number>; query_matrix_rows: number; enabled_query_jobs: number; errors: string[] };
+  active_command_source: string;
+  query_matrix_rows: number;
+  enabled_query_jobs: number;
   segments: { category_id: string; name: string; tier: number; buyer_type: string; terms: string[] }[];
   keywords: { set: string; count: number; languages: string[] };
   governorates: { id: string; name: string; name_ar: string; bbox: number[]; density: string }[];
@@ -21,7 +24,7 @@ export type LeadRunRequest = {
 };
 
 export type LeadRunPlan = {
-  dry_run: boolean; enabled_sources: string[]; governorates: string[]; segments: string[];
+  dry_run: true; enabled_sources: string[]; governorates: string[]; segments: string[];
   keyword_count: number; planned_jobs: number; missing_credentials: string[]; warnings: string[];
 };
 
@@ -31,7 +34,7 @@ export type LeadJob = {
 };
 
 export type LeadRun = {
-  run_uid: string; name: string; mode: string; sources: string[]; geography: Record<string, unknown>;
+  dry_run: false; run_uid: string; name: string; mode: string; sources: string[]; geography: Record<string, unknown>;
   segments: string[]; keywords: string[]; status: string; planned_jobs: number; processed: number;
   found: number; unique_count: number; duplicates: number; errors: number; current_source?: string;
   current_governorate?: string; current_category?: string; warnings: string[]; progress_percent: number;

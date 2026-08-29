@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from io import BytesIO
+import sys
+from types import ModuleType, SimpleNamespace
 
-import pyarrow as pa
 import pytest
 from openpyxl import Workbook, load_workbook
-from shapely import Point
 
 from backend.db.session import session_scope
 from backend.leads.collectors import CollectionContext, OSMGeofabrikCollector, OvertureCollector, SourceRateLimitError
@@ -14,7 +14,69 @@ from backend.leads.normalization import LeadNormalizer, RawLeadRecord
 from backend.leads.scoring import LeadScorer
 from backend.leads.service import LeadAcquisitionService
 from backend.leads.sources import LeadSourceRegistry
+from backend.leads.workbook import LeadWorkbookService
 from backend.schemas.leads import LeadRunRequest
+
+
+class FakeRecordBatch:
+    def __init__(self, rows: list[dict]) -> None:
+        self._rows = rows
+
+    def to_pylist(self) -> list[dict]:
+        return self._rows
+
+
+def install_fake_overture_reader(monkeypatch, rows: list[dict]) -> None:
+    module = ModuleType("overturemaps")
+    module.record_batch_reader = lambda *args, **kwargs: [FakeRecordBatch(rows)]
+    monkeypatch.setitem(sys.modules, "overturemaps", module)
+    shapely = ModuleType("shapely")
+    shapely.from_wkb = lambda value: SimpleNamespace(x=31.2357, y=30.0444, geom_type="Point")
+    monkeypatch.setitem(sys.modules, "shapely", shapely)
+
+
+def test_numbered_workbook_aliases_and_structured_headers(tmp_path) -> None:
+    workbook = Workbook()
+    workbook.remove(workbook.active)
+    definitions = {
+        "10_Lead_Segments": (["Category_ID", "Phase", "Tier", "Segment_EN", "Buyer_Type"], ["CAT-001", 1, "A+", "Cosmetics Importers", "B2B"]),
+        "11_Keyword_Master": (["Keyword_ID", "Category_ID", "Keyword", "Lang", "Status"], ["KW-001", "CAT-001", "cosmetics importer", "EN", "ENABLED"]),
+        "12_Egypt_Coverage": (["Gov_ID", "Governorate_EN", "Governorate_AR"], ["GOV-01", "Cairo", "القاهرة"]),
+        "13_Source_Registry": (["Source_ID", "Source"], ["SRC-001", "Overture"]),
+        "14_Query_Matrix": (["Query_ID", "Enabled", "Keyword_ID"], ["Q-001", True, "KW-001"]),
+        "19_Run_Config": (["Config_ID", "Key", "Value"], ["CFG-001", "country_code", "EG"]),
+    }
+    for name, (headers, values) in definitions.items():
+        sheet = workbook.create_sheet(name)
+        sheet.append(["Title"])
+        sheet.append(["Description"])
+        sheet.append(headers)
+        sheet.append(values)
+    target = tmp_path / "numbered.xlsx"
+    workbook.save(target)
+
+    service = LeadWorkbookService()
+    preview = service.preview(target)
+    assert preview["status"] == "VALID"
+    assert preview["active_command_source"] == "WORKBOOK"
+    assert preview["resolved_sheets"]["Lead Segments"] == "10_Lead_Segments"
+    assert preview["sheet_counts"]["Keyword Master"] == 1
+    assert preview["query_matrix_rows"] == preview["enabled_query_jobs"] == 1
+    assert service.rows("Keyword Master", target)[0]["Keyword"] == "cosmetics importer"
+
+
+def test_actual_command_workbook_counts_when_present() -> None:
+    service = LeadWorkbookService()
+    if service.find() is None:
+        pytest.skip("Runtime command workbook is not present")
+    preview = service.preview()
+    assert preview["status"] == "VALID"
+    assert preview["active_command_source"] == "WORKBOOK"
+    assert preview["sheet_counts"]["Keyword Master"] == 431
+    assert preview["sheet_counts"]["Lead Segments"] == 50
+    assert preview["sheet_counts"]["Egypt Coverage"] == 27
+    assert preview["query_matrix_rows"] == 11_475
+    assert preview["enabled_query_jobs"] == 11_475
 
 
 def test_source_registry_and_full_egypt_control_catalog() -> None:
@@ -28,9 +90,14 @@ def test_source_registry_and_full_egypt_control_catalog() -> None:
     with session_scope() as session:
         options = LeadAcquisitionService(session).control_options()
         assert len(options["governorates"]) == 27
-        assert len(options["segments"]) >= 37
-        assert options["keywords"]["count"] >= 70
-        assert options["workbook"]["status"] == "NOT_FOUND_USING_CONFIG_DEFAULTS"
+        if options["workbook"]["status"] == "VALID":
+            assert options["active_command_source"] == "WORKBOOK"
+            assert len(options["segments"]) == 50
+            assert options["keywords"]["count"] == 431
+            assert options["query_matrix_rows"] == options["enabled_query_jobs"] == 11_475
+        else:
+            assert len(options["segments"]) >= 37
+            assert options["keywords"]["count"] >= 70
         assert options["workbook"]["placement"].startswith("data/imports/lead_control/")
 
 
@@ -99,7 +166,7 @@ def test_dedupe_merges_cross_source_but_preserves_distinct_branches() -> None:
 def test_dedupe_domain_signal_merges_and_keeps_source_provenance() -> None:
     with session_scope() as session:
         service = LeadAcquisitionService(session)
-        run = service.create_run(LeadRunRequest(name="domain dedupe", sources=["SRC_OVERTURE"], governorates=["cairo"], segments=["beauty_suppliers"], execute=False))
+        run = service.create_run(LeadRunRequest(name="domain dedupe", sources=["SRC_OVERTURE"], governorates=["cairo"], segments=["cosmetics_suppliers"], execute=False))
         job = run.jobs[0]
         first = RawLeadRecord(source_uid="SRC_OVERTURE", source_record_id="domain-1", business_name="Beauty Supply Egypt", category_raw="beauty_supply_store", website="https://www.beauty.example/", latitude=30.04, longitude=31.23)
         second = RawLeadRecord(source_uid="SRC_OSM_GEOFABRIK", source_record_id="node/domain-2", business_name="Beauty Supply EG", category_raw="beauty_supply_store", website="https://beauty.example/contact", latitude=30.0401, longitude=31.2301)
@@ -127,7 +194,7 @@ def test_run_dry_plan_checkpoint_and_controls() -> None:
 
 def test_overture_collector_streams_filtered_sample(monkeypatch) -> None:
     row = {
-        "id": "real-shape-sample", "geometry": Point(31.2357, 30.0444).wkb,
+        "id": "real-shape-sample", "geometry": b"point",
         "categories": {"primary": "pharmacy", "alternate": []}, "confidence": 0.92,
         "websites": ["https://example.test"], "emails": [], "socials": [], "phones": ["+201000000000"],
         "brand": None, "addresses": [{"freeform": "Cairo", "locality": "Cairo", "postcode": None, "region": "Cairo", "country": "EG"}],
@@ -135,8 +202,7 @@ def test_overture_collector_streams_filtered_sample(monkeypatch) -> None:
         "operating_status": "open", "basic_category": "business", "taxonomy": None, "version": 1,
         "bbox": {"xmin": 31.2357, "xmax": 31.2357, "ymin": 30.0444, "ymax": 30.0444},
     }
-    reader = pa.RecordBatchReader.from_batches(pa.Table.from_pylist([row]).schema, pa.Table.from_pylist([row]).to_batches())
-    monkeypatch.setattr("overturemaps.record_batch_reader", lambda *args, **kwargs: reader)
+    install_fake_overture_reader(monkeypatch, [row])
     monkeypatch.setattr(OvertureCollector, "discover_latest_release", lambda self: "test-release")
     records = []
     context = CollectionContext(source_uid="SRC_OVERTURE", run_uid="r", job_uid="j", governorate="cairo", tile={"bbox": [31.2, 30.0, 31.3, 30.1]}, segment_ids=["pharmacies"], keywords=["pharmacy"], max_records=10)
@@ -147,14 +213,13 @@ def test_overture_collector_streams_filtered_sample(monkeypatch) -> None:
 
 def test_overture_checkpoint_resume_skips_already_processed_rows(monkeypatch) -> None:
     base = {
-        "geometry": Point(31.2357, 30.0444).wkb, "categories": {"primary": "pharmacy", "alternate": []},
+        "geometry": b"point", "categories": {"primary": "pharmacy", "alternate": []},
         "confidence": 0.9, "websites": [], "emails": [], "socials": [], "phones": [], "brand": None,
         "addresses": [], "names": {"primary": "Pharmacy", "common": None, "rules": None}, "sources": [],
         "operating_status": "open", "basic_category": "business", "taxonomy": None, "version": 1,
         "bbox": {"xmin": 31.2357, "xmax": 31.2357, "ymin": 30.0444, "ymax": 30.0444},
     }
-    table = pa.Table.from_pylist([{**base, "id": "already-done"}, {**base, "id": "resume-here"}])
-    monkeypatch.setattr("overturemaps.record_batch_reader", lambda *args, **kwargs: pa.RecordBatchReader.from_batches(table.schema, table.to_batches()))
+    install_fake_overture_reader(monkeypatch, [{**base, "id": "already-done"}, {**base, "id": "resume-here"}])
     monkeypatch.setattr(OvertureCollector, "discover_latest_release", lambda self: "test-release")
     records = []
     context = CollectionContext(source_uid="SRC_OVERTURE", run_uid="r", job_uid="j", governorate="cairo", tile={"bbox": [31.2, 30.0, 31.3, 30.1]}, segment_ids=["pharmacies"], keywords=["pharmacy"], checkpoint={"raw_position": 1})
@@ -222,9 +287,16 @@ def test_lead_api_workbook_pagination_controls_and_exports(api_request) -> None:
     assert api_request("POST", f"/lead-runs/{uid}/cancel").status_code == 200
     assert api_request("GET", "/lead-runs?offset=0&limit=10").json()["total"] == 1
     assert api_request("GET", "/leads?offset=0&limit=10").json()["total"] == 0
-    for format_name in ("csv", "xlsx", "parquet"):
+    for format_name in ("csv", "xlsx"):
         response = api_request("POST", "/leads/export", json={"format": format_name})
         assert response.status_code == 200 and response.content
+    parquet = api_request("POST", "/leads/export", json={"format": "parquet"})
+    parquet_status = api_request("GET", "/system/settings").json()["data_runtime"]["parquet"]
+    if parquet_status["available"]:
+        assert parquet.status_code == 200 and parquet.content
+    else:
+        assert parquet.status_code == 503
+        assert parquet.json() == {"detail": "PARQUET_EXPORT_UNAVAILABLE"}
 
     workbook = Workbook()
     workbook.remove(workbook.active)
