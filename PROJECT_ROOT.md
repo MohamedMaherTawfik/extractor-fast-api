@@ -107,6 +107,7 @@ Local-first, private-first, portable, modular, config-driven, and API-first.
 - Reviewable telesales tasks and factual quote/order drafts that never post Product/Sales transactions
 - Native Windows Desktop UI / Operator Control Center with feature-discovered navigation, API-backed workspaces, Tauri security boundaries, RTL/LTR themes, generation gating, and conversation review/send workflows
 - Lead Data Acquisition Engine with governed source registry, Overture and OSM/Geofabrik collectors, resumable durable runs, deterministic normalization/deduplication/scoring, provenance, server-paginated results, and CSV/XLSX/Parquet export
+- Dedicated local AI Video Studio with character identity memory, reusable master-prompt recipes, config-routed Wan/Hunyuan/AnimateDiff/SVD ComfyUI workflows, durable GPU queue progress, versioned assets, and content-calendar batching
 
 ## Important Paths
 
@@ -135,7 +136,7 @@ SQLite is at Alembic revision `0010_lead_acquisition`. In addition to the existi
 
 ## Last Completed Work
 
-Completed and audited Lead Data Acquisition Engine 1.0.0. Real bounded Cairo pharmacy collection succeeded through both Overture and OSM, persisted 20 canonical leads with provenance, exposed them through paginated APIs and all three exports, and rendered them in the native Tauri Data Acquisition workspace. The nationwide action was dry-run only and was not executed.
+Completed the Local AI Video Generation Engine 1.0.0 as an isolated extension. It adds ComfyUI API workflow execution, character identity memory, reusable master prompts, config-driven Wan/Hunyuan/AnimateDiff/SVD routing, durable GPU worker progress, versioned video assets, automation batches, and the desktop AI Video Studio. GPU model weights and installation-specific API workflow exports remain deployment inputs on the dedicated GPU host.
 
 ## Current Blockers
 
@@ -143,7 +144,7 @@ No Lead Engine or Desktop UI execution blocker. The optional Lead control workbo
 
 ## Next Step
 
-Build the Portable Production Runtime next. Do not start it, a full-Egypt lead run, installer engineering, signing, publishing, or paid provider integrations implicitly from this completed audit.
+Configure and validate the selected model workflow on the dedicated ComfyUI GPU host, then build the Portable Production Runtime. Do not start a full-Egypt lead run, installer engineering, signing, publishing, or paid provider integrations implicitly.
 
 ## Non-negotiable Rules
 

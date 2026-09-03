@@ -1,0 +1,117 @@
+version: 1.0.0
+default_model: wan_video
+worker_concurrency: 1
+poll_interval_seconds: 1.0
+generation_timeout_seconds: 3600
+max_reference_size_bytes: 26214400
+
+# Workflow files must be ComfyUI API-format JSON. The included files are
+# injection templates; export the matching production graph from ComfyUI and
+# retain these node IDs/inputs, or update the mappings below.
+models:
+  - model_id: wan_video
+    display_name: Wan Video
+    workflow_file: wan_video.json
+    enabled: true
+    fps: 16
+    max_duration_seconds: 20
+    aspect_ratios: ["1:1", "4:5", "9:16", "16:9"]
+    supports_image_reference: true
+    output_node_ids: ["30"]
+    injections:
+      positive_prompt: {node_id: "6", input: text}
+      negative_prompt: {node_id: "7", input: text}
+      reference_image: {node_id: "10", input: image}
+      width: {node_id: "20", input: width}
+      height: {node_id: "20", input: height}
+      num_frames: {node_id: "20", input: length}
+      fps: {node_id: "30", input: frame_rate}
+      seed: {node_id: "20", input: seed}
+  - model_id: hunyuan_video
+    display_name: Hunyuan Video
+    workflow_file: hunyuan_video.json
+    enabled: true
+    fps: 16
+    max_duration_seconds: 20
+    aspect_ratios: ["1:1", "4:5", "9:16", "16:9"]
+    supports_image_reference: true
+    output_node_ids: ["30"]
+    injections:
+      positive_prompt: {node_id: "6", input: text}
+      negative_prompt: {node_id: "7", input: text}
+      reference_image: {node_id: "10", input: image}
+      width: {node_id: "20", input: width}
+      height: {node_id: "20", input: height}
+      num_frames: {node_id: "20", input: length}
+      fps: {node_id: "30", input: frame_rate}
+      seed: {node_id: "20", input: seed}
+  - model_id: animatediff
+    display_name: AnimateDiff
+    workflow_file: animatediff.json
+    enabled: true
+    fps: 16
+    max_duration_seconds: 16
+    aspect_ratios: ["1:1", "4:5", "9:16", "16:9"]
+    supports_image_reference: true
+    output_node_ids: ["30"]
+    injections:
+      positive_prompt: {node_id: "6", input: text}
+      negative_prompt: {node_id: "7", input: text}
+      reference_image: {node_id: "10", input: image}
+      width: {node_id: "20", input: width}
+      height: {node_id: "20", input: height}
+      num_frames: {node_id: "20", input: length}
+      fps: {node_id: "30", input: frame_rate}
+      seed: {node_id: "20", input: seed}
+  - model_id: stable_video_diffusion
+    display_name: Stable Video Diffusion
+    workflow_file: stable_video_diffusion.json
+    enabled: true
+    fps: 8
+    max_duration_seconds: 8
+    aspect_ratios: ["9:16", "16:9"]
+    supports_image_reference: true
+    output_node_ids: ["30"]
+    injections:
+      positive_prompt: {node_id: "6", input: text}
+      negative_prompt: {node_id: "7", input: text}
+      reference_image: {node_id: "10", input: image}
+      width: {node_id: "20", input: width}
+      height: {node_id: "20", input: height}
+      num_frames: {node_id: "20", input: length}
+      fps: {node_id: "30", input: frame_rate}
+      seed: {node_id: "20", input: seed}
+
+recipes:
+  - recipe_id: EMY_CHARACTER_V1
+    name: EMY Character Cinematic V1
+    master_prompt: >-
+      Create a polished cinematic product video centered on the approved EMY
+      character reference. Treat the supplied reference as the immutable visual
+      identity source and maintain temporal continuity across the full shot.
+    camera_style: premium commercial cinematography, natural lens behavior
+    lighting: soft directional key light with controlled highlights and realistic skin tones
+    colors: refined warm neutrals with clean product contrast
+    environment: coherent premium advertising set appropriate to the idea
+    realism_level: photorealistic with natural materials and physically plausible motion
+    motion_style: smooth deliberate movement, no sudden pose or wardrobe changes
+    negative_prompt:
+      - face replacement
+      - age change
+      - different person
+      - hairstyle variation
+      - wardrobe mutation
+      - plastic skin
+      - camera jitter
+  - recipe_id: EMY_PRODUCT_BEAUTY_V1
+    name: EMY Beauty Product V1
+    master_prompt: >-
+      Produce an elegant beauty campaign film with a stable hero character and
+      precise product-focused blocking. Preserve the reference identity exactly.
+    camera_style: macro beauty inserts and a slow hero push-in
+    lighting: diffused beauty lighting with glossy controlled product highlights
+    colors: cream, champagne, soft rose and clean whites
+    environment: minimal luxury skincare studio
+    realism_level: high-end photoreal commercial finish
+    motion_style: graceful gestures, subtle hair motion and stable product geometry
+    negative_prompt: [identity drift, label distortion, waxy skin, oversaturation, flicker]

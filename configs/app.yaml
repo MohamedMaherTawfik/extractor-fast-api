@@ -19,6 +19,9 @@ rules_engine_version: 1.0.0
 generation_config_file: generation.yaml
 generation_engine_version: 1.0.0
 run_live_generation_tests: false
+video_generation_config_file: video_generation.yaml
+video_generation_engine_version: 1.0.0
+comfyui_base_url: http://127.0.0.1:8188
 sales_engine_version: 1.0.0
 sales_config_file: sales.yaml
 allow_negative_stock: false

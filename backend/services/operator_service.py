@@ -24,6 +24,7 @@ class OperatorService:
                 "patterns_recipes": {"enabled": True, "version": self.settings.recipe_engine_version},
                 "rules": {"enabled": True, "version": self.settings.rules_engine_version},
                 "generation": {"enabled": True, "version": self.settings.generation_engine_version},
+                "video_studio": {"enabled": True, "version": self.settings.video_generation_engine_version, "provider": "comfyui"},
                 "sales": {"enabled": True, "version": self.settings.sales_engine_version},
                 "msc": {"enabled": True, "version": self.settings.sales_engine_version},
                 "answer_bot": {"enabled": True, "version": self.settings.answer_bot_version},
@@ -54,7 +55,7 @@ class OperatorService:
         return {
             "backend": {"host": self.settings.host, "port": self.settings.port, "environment": self.settings.environment},
             "privacy": {"messaging": self.settings.messaging_privacy_mode, "live_generation_tests": self.settings.run_live_generation_tests, "live_messaging_tests": self.settings.run_live_messaging_tests, "live_msc_tests": self.settings.run_live_msc_extraction_tests},
-            "versions": {"app": self.settings.version, "generation": self.settings.generation_engine_version, "sales": self.settings.sales_engine_version, "answer_bot": self.settings.answer_bot_version, "lead_acquisition": self.settings.lead_acquisition_version},
+            "versions": {"app": self.settings.version, "generation": self.settings.generation_engine_version, "video_studio": self.settings.video_generation_engine_version, "sales": self.settings.sales_engine_version, "answer_bot": self.settings.answer_bot_version, "lead_acquisition": self.settings.lead_acquisition_version},
             "channels": ChannelRegistry().status(),
             "data_runtime": data_runtime_capabilities(),
         }

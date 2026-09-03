@@ -8,6 +8,8 @@ data/temp/
 data/imports/
 data/raw/
 data/media/
+data/assets/
+data/video_generation/
 data/lead_acquisition/
 database/*.db
 database/*.db-shm

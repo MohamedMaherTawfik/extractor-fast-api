@@ -1,0 +1,8 @@
+{
+  "6": {"class_type": "CLIPTextEncode", "inputs": {"text": "EMY_POSITIVE_PROMPT", "clip": ["1", 1]}},
+  "7": {"class_type": "CLIPTextEncode", "inputs": {"text": "EMY_NEGATIVE_PROMPT", "clip": ["1", 1]}},
+  "10": {"class_type": "LoadImage", "inputs": {"image": "EMY_REFERENCE.png"}},
+  "20": {"class_type": "SVDImageToVideo", "inputs": {"positive": ["6", 0], "negative": ["7", 0], "image": ["10", 0], "model": ["1", 0], "width": 1024, "height": 576, "length": 25, "seed": -1}},
+  "30": {"class_type": "VHS_VideoCombine", "inputs": {"images": ["20", 0], "frame_rate": 8, "filename_prefix": "EMY/svd", "format": "video/h264-mp4", "pingpong": false, "save_output": true}},
+  "1": {"class_type": "ImageOnlyCheckpointLoader", "inputs": {"ckpt_name": "CONFIGURE_ON_GPU_MACHINE"}}
+}

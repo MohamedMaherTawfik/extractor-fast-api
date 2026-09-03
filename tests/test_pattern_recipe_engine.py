@@ -136,7 +136,10 @@ def _create_analyzed(session, spec: dict, prefix: str = "synthetic", *, with_per
         content_type=ContentType.SHORT,
         language="en",
         duration_ms=4000,
-        published_at=datetime.now(UTC) - timedelta(days=spec["id"]),
+        # Keep the synthetic comparison cohort in one publication month. Using
+        # datetime.now made this fixture fail whenever a test run crossed the
+        # month boundary it was originally authored around.
+        published_at=datetime(2026, 8, 30, tzinfo=UTC) - timedelta(days=spec["id"]),
         views=spec["views"] if with_performance else None,
         shares=spec["shares"] if with_performance else None,
         raw_metadata=_observations(spec),

@@ -1,5 +1,20 @@
 # Project Changelog
 
+## 2026-09-03 — Local AI Video Generation Engine 1.0.0
+
+- Added an isolated `backend/generation/video_engine` extension without changing the existing contract-first Generation Engine, Lead Acquisition, Sales, MSC, Workbook, or desktop workspace implementations.
+- Added durable character identity memory for references, structured identity/style profiles, recurring attributes, negative constraints, versions, and checksums.
+- Added reusable fixed master-prompt recipes that expand a short idea into positive/negative prompts, camera, lighting, color, environment, realism, motion, output, identity-lock, and deterministic script sections.
+- Added config-driven routing for Wan Video, Hunyuan Video, AnimateDiff, and Stable Video Diffusion rather than hardcoding a single model.
+- Added ComfyUI API-format workflow loading and node injection, reference upload, prompt queue submission, queue/history progress tracking, cancellation, output discovery, and output retrieval.
+- Added a bounded dedicated GPU worker queue with durable queued/running/completed/failed/cancelled job state and retry support; no hardware diagnostics were added.
+- Added project-relative video job/batch persistence and versioned EMY assets containing video, prompt, script, identity checksum, request, model/workflow, ComfyUI prompt, output-node, file checksum, and save state metadata.
+- Added batch content-calendar input for up to 120 items, retaining calendar IDs and publish times across script → prompt → job → asset flow.
+- Added `/video-studio` character, configuration, job, batch, progress, asset, content, retry, cancel, and save APIs.
+- Added the feature-discovered desktop AI Video Studio with character upload, recipes, idea and output controls, progress polling, preview, asset save, batch queue, and asset library views.
+- Added dedicated GPU deployment documentation and externally configurable ComfyUI workflow templates. Installation-specific node packs, model weights, and exported API graphs remain deployment inputs.
+- Verification: all 134 backend tests passed, all 6 frontend files / 13 tests passed, Python compilation and the production TypeScript/Vite build passed, and project dependencies are consistent; no live GPU render was attempted on the development device.
+
 ## 2026-08-26 — Lead Data Acquisition Engine 1.0.0 — AUDITED COMPLETE
 
 - Resumed at the exact interruption point: the Lead implementation had been committed after a backend regression stopped at 120 passed / 1 stale operator-capability assertion, before live source and native desktop proof. Existing working components were retained.

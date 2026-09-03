@@ -85,6 +85,9 @@ class Settings(BaseSettings):
     generation_config_file: str = "generation.yaml"
     generation_engine_version: str = "1.0.0"
     run_live_generation_tests: bool = False
+    video_generation_config_file: str = "video_generation.yaml"
+    video_generation_engine_version: str = "1.0.0"
+    comfyui_base_url: str = "http://127.0.0.1:8188"
     sales_engine_version: str = "1.0.0"
     sales_config_file: str = "sales.yaml"
     allow_negative_stock: bool = False

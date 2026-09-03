@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Activity, Archive, BarChart3, Bell, Bot, Boxes, CalendarDays, ChevronLeft, CircleDollarSign, ClipboardCheck,
   Command, Factory, FileSearch, Gauge, Grid2X2, Languages, Menu, MessageSquareText, Moon, PackageSearch, PanelLeftClose,
-  Search, Settings, ShieldCheck, Sparkles, Sun, UsersRound, WandSparkles, DatabaseZap,
+  Search, Settings, ShieldCheck, Sparkles, Sun, UsersRound, WandSparkles, DatabaseZap, Clapperboard,
 } from "lucide-react";
 import { operatorApi } from "../api/operator";
 import { useFeatures } from "../app/FeatureContext";
@@ -16,6 +16,7 @@ import { StatusBadge } from "./StatusBadge";
 const nav = [
   ["home", "/", Gauge, "content"], ["content", "/content", Grid2X2, "content"], ["intelligence", "/intelligence", Sparkles, "intelligence"],
   ["patterns", "/patterns", WandSparkles, "patterns_recipes"], ["rules", "/rules", ShieldCheck, "rules"], ["generation", "/generation", Factory, "generation"],
+  ["videoStudio", "/video-studio", Clapperboard, "video_studio"],
   ["assets", "/assets", Archive, "generation"], ["calendar", "/calendar", CalendarDays, "content_calendar"], ["products", "/products", PackageSearch, "sales"],
   ["leads", "/data-acquisition", DatabaseZap, "lead_engine"],
   ["customers", "/customers", UsersRound, "sales"], ["sales", "/sales", CircleDollarSign, "sales"], ["inventory", "/inventory", Boxes, "sales"],

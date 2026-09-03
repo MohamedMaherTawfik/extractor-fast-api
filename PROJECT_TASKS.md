@@ -17,4 +17,5 @@
 - [x] Build Answer Bot
 - [x] Build Desktop UI
 - [x] Build Lead Data Acquisition Engine
+- [x] Build Local AI Video Generation Engine
 - [ ] Build Portable Production Runtime
