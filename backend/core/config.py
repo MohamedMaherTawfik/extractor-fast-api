@@ -4,7 +4,7 @@ from functools import lru_cache
 from typing import Any, Literal
 
 import yaml
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic.fields import FieldInfo
 from pydantic_settings import (
     BaseSettings,
@@ -57,6 +57,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
+        populate_by_name=True,
     )
 
     app_name: str = "EMY Private AI OS"
@@ -104,6 +105,37 @@ class Settings(BaseSettings):
     messaging_privacy_mode: str = "LOCAL_ONLY"
     lead_acquisition_config_file: str = "lead_acquisition.yaml"
     lead_acquisition_version: str = "1.0.0"
+    creator_discovery_config_file: str = "creator_discovery.yaml"
+    creator_discovery_version: str = "1.0.0"
+    run_live_creator_discovery_tests: bool = False
+    creator_discovery_youtube_api_key: str | None = Field(default=None, repr=False)
+    meta_app_id: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("META_APP_ID", "EMY_META_APP_ID"),
+    )
+    meta_app_secret: str | None = Field(
+        default=None,
+        repr=False,
+        validation_alias=AliasChoices("META_APP_SECRET", "EMY_META_APP_SECRET"),
+    )
+    meta_access_token: str | None = Field(
+        default=None,
+        repr=False,
+        validation_alias=AliasChoices("META_ACCESS_TOKEN", "EMY_META_ACCESS_TOKEN"),
+    )
+    meta_graph_api_version: str = Field(
+        default="v26.0",
+        pattern=r"^v\d+\.\d+$",
+        validation_alias=AliasChoices("META_GRAPH_API_VERSION", "EMY_META_GRAPH_API_VERSION"),
+    )
+    meta_facebook_page_id: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("META_FACEBOOK_PAGE_ID", "EMY_META_FACEBOOK_PAGE_ID"),
+    )
+    meta_instagram_account_id: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("META_INSTAGRAM_ACCOUNT_ID", "EMY_META_INSTAGRAM_ACCOUNT_ID"),
+    )
     run_live_overture_tests: bool = False
     run_live_osm_tests: bool = False
     run_live_google_places_tests: bool = False

@@ -149,6 +149,16 @@ def test_database_migrations_upgrade_and_downgrade(tmp_path) -> None:
         "lead_dedupe_events",
         "lead_control_imports",
         "opt_in_leads",
+        "creator_discovery_runs",
+        "creator_discovery_jobs",
+        "creator_candidates",
+        "creator_profiles",
+        "creator_discovery_accounts",
+        "creator_content_samples",
+        "creator_analysis",
+        "creator_match_evidence",
+        "creator_sources",
+        "creator_industries",
     }
     assert revision == CURRENT_SCHEMA_REVISION
     assert expected_tables == set(inspect(engine).get_table_names())

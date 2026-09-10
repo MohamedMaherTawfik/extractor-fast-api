@@ -16,6 +16,7 @@ const AnalyticsPage = lazy(() => import("./routes/AnalyticsPage"));
 const SettingsPage = lazy(() => import("./routes/SettingsPage"));
 const DataAcquisitionPage = lazy(() => import("./routes/DataAcquisitionPage"));
 const VideoStudioPage = lazy(() => import("./routes/VideoStudioPage"));
+const CreatorDiscoveryPage = lazy(() => import("./routes/CreatorDiscoveryPage"));
 
 const Guard = ({ children }: { children: React.ReactNode }) => <RouteErrorBoundary><Suspense fallback={<LoadingState />}>{children}</Suspense></RouteErrorBoundary>;
 export default function App() {
@@ -32,6 +33,7 @@ export default function App() {
     <Route path="customer-service" element={<Guard><CustomerServicePage /></Guard>} /><Route path="approvals" element={<Guard><ApprovalsPage /></Guard>} />
     <Route path="analytics" element={<Guard><AnalyticsPage /></Guard>} /><Route path="audit" element={<Guard><AuditPage /></Guard>} />
     <Route path="data-acquisition" element={<Guard><DataAcquisitionPage /></Guard>} />
+    <Route path="creator-discovery" element={<Guard><CreatorDiscoveryPage /></Guard>} />
     <Route path="settings" element={<Guard><SettingsPage /></Guard>} /><Route path="*" element={<Navigate to="/" replace />} />
   </Route></Routes>;
 }

@@ -108,6 +108,7 @@ Local-first, private-first, portable, modular, config-driven, and API-first.
 - Native Windows Desktop UI / Operator Control Center with feature-discovered navigation, API-backed workspaces, Tauri security boundaries, RTL/LTR themes, generation gating, and conversation review/send workflows
 - Lead Data Acquisition Engine with governed source registry, Overture and OSM/Geofabrik collectors, resumable durable runs, deterministic normalization/deduplication/scoring, provenance, server-paginated results, and CSV/XLSX/Parquet export
 - Dedicated local AI Video Studio with character identity memory, reusable master-prompt recipes, config-routed Wan/Hunyuan/AnimateDiff/SVD ComfyUI workflows, durable GPU queue progress, versioned assets, and content-calendar batching
+- Multi-Platform Creator Discovery Studio with seven capability-reporting adapters, URL/name/CSV/XLSX input, deterministic evidence matching, human identity review, unified profiles, content-analysis integration, checkpointed runs, provenance, server pagination, refresh, and exact-schema CSV/XLSX export
 
 ## Important Paths
 
@@ -128,7 +129,7 @@ Local-first, private-first, portable, modular, config-driven, and API-first.
 
 ## Database Status
 
-SQLite is at Alembic revision `0010_lead_acquisition`. In addition to the existing application domains, it persists `lead_sources`, `lead_runs`, `lead_jobs`, `leads`, `lead_source_records`, `lead_dedupe_events`, `lead_control_imports`, and the deliberately separate consent-bearing `opt_in_leads` table.
+SQLite is at Alembic revision `0011_creator_discovery`. Creator Discovery adds durable runs/jobs, candidates, unified profiles, platform accounts, content samples, analyses, match evidence, field provenance, and an extensible industry taxonomy to the existing application database.
 
 ## Current Version
 
@@ -136,15 +137,15 @@ SQLite is at Alembic revision `0010_lead_acquisition`. In addition to the existi
 
 ## Last Completed Work
 
-Completed the Local AI Video Generation Engine 1.0.0 as an isolated extension. It adds ComfyUI API workflow execution, character identity memory, reusable master prompts, config-driven Wan/Hunyuan/AnimateDiff/SVD routing, durable GPU worker progress, versioned video assets, automation batches, and the desktop AI Video Studio. GPU model weights and installation-specific API workflow exports remain deployment inputs on the dedicated GPU host.
+Implemented Creator Discovery Studio 1.0.0 as an isolated extension. It adds seven explicit platform adapter boundaries, official YouTube Data API support, URL/name/file input, deterministic match evidence and review, unified and platform-specific records, evidence-only analysis, run checkpoints, refresh, a dedicated desktop workspace, and exact written-schema exports. Automated platform coverage remains partial until approved APIs are configured.
 
 ## Current Blockers
 
-No Lead Engine or Desktop UI execution blocker. The optional Lead control workbook is absent, so the validated YAML catalog supplies 78 keywords, 37 segments, and 27 governorates. Google Places and Foursquare credentials are not configured and their adapters remain interface-only and disabled; website enrichment, registry verification, and licensed directory sources are also disabled. Existing messaging, timezone, master-control workbook, and FFmpeg limitations remain unchanged.
+No Creator Discovery module or Desktop UI execution blocker. The referenced Creator Discovery XLSX was not included, so export compatibility is verified against the exact written sheet/column schema. YouTube API support has no configured key; the other six platforms require approved API integrations for automatic discovery/sampling. The optional Lead control workbook is also absent, and existing lead-source, messaging, timezone, master-control workbook, GPU-workflow, and FFmpeg limitations remain unchanged.
 
 ## Next Step
 
-Configure and validate the selected model workflow on the dedicated ComfyUI GPU host, then build the Portable Production Runtime. Do not start a full-Egypt lead run, installer engineering, signing, publishing, or paid provider integrations implicitly.
+Configure only the approved creator-platform APIs needed for broader live discovery, then build the Portable Production Runtime. Do not start a mass creator crawl, full-Egypt lead run, installer engineering, signing, publishing, or paid provider integrations implicitly.
 
 ## Non-negotiable Rules
 

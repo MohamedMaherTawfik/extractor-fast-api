@@ -19,6 +19,7 @@ const nav = [
   ["videoStudio", "/video-studio", Clapperboard, "video_studio"],
   ["assets", "/assets", Archive, "generation"], ["calendar", "/calendar", CalendarDays, "content_calendar"], ["products", "/products", PackageSearch, "sales"],
   ["leads", "/data-acquisition", DatabaseZap, "lead_engine"],
+  ["creatorDiscovery", "/creator-discovery", UsersRound, "creator_discovery"],
   ["customers", "/customers", UsersRound, "sales"], ["sales", "/sales", CircleDollarSign, "sales"], ["inventory", "/inventory", Boxes, "sales"],
   ["suppliers", "/suppliers", Factory, "sales"], ["msc", "/msc", FileSearch, "msc"], ["conversations", "/conversations", MessageSquareText, "answer_bot"],
   ["service", "/customer-service", Bot, "answer_bot"], ["approvals", "/approvals", ClipboardCheck, "rules"], ["analytics", "/analytics", BarChart3, "content"],

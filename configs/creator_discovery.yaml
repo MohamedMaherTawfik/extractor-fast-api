@@ -1,0 +1,46 @@
+version: 1.0.0
+execution:
+  max_inputs_per_run: 10000
+  max_inline_jobs: 100
+  default_sample_size: 10
+  max_sample_size: 30
+  request_timeout_seconds: 15
+  allow_public_page_fetch: false
+matching:
+  thresholds:
+    confirmed: 95
+    high_confidence: 80
+    possible: 60
+    review_required: 35
+  weights:
+    direct_url: 50
+    normalized_name: 22
+    username_similarity: 12
+    bio_similarity: 6
+    linked_social_urls: 20
+    website_domain: 15
+    content_topic_similarity: 10
+    public_location: 5
+    brand_names: 5
+    profile_naming_consistency: 5
+platforms:
+  youtube: {name_discovery: API_REQUIRED, direct_url: IDENTITY_ONLY, content_sampling: API_REQUIRED}
+  facebook: {name_discovery: API_REQUIRED, direct_url: IDENTITY_ONLY, content_sampling: API_REQUIRED}
+  instagram: {name_discovery: API_REQUIRED, direct_url: IDENTITY_ONLY, content_sampling: API_REQUIRED}
+  tiktok: {name_discovery: API_REQUIRED, direct_url: IDENTITY_ONLY, content_sampling: API_REQUIRED}
+  snapchat: {name_discovery: MANUAL_URL_REQUIRED, direct_url: IDENTITY_ONLY, content_sampling: API_REQUIRED}
+  linkedin: {name_discovery: API_REQUIRED, direct_url: IDENTITY_ONLY, content_sampling: API_REQUIRED}
+  x: {name_discovery: API_REQUIRED, direct_url: IDENTITY_ONLY, content_sampling: API_REQUIRED}
+industry_taxonomy:
+  - {code: education, name: Education, keywords: [education, educational, learn, science, tutorial, explain]}
+  - {code: technology, name: Technology, keywords: [technology, tech, gadget, software, hardware, phone, computer]}
+  - {code: entertainment, name: Entertainment, keywords: [entertainment, comedy, comedian, music, celebrity]}
+  - {code: food, name: Food, keywords: [food, cooking, recipe, restaurant, chef]}
+  - {code: gaming, name: Gaming, keywords: [gaming, gamer, esports, gameplay]}
+  - {code: lifestyle, name: Lifestyle, keywords: [lifestyle, fashion, family, daily life]}
+  - {code: sports, name: Sports, keywords: [sports, football, fitness, athlete]}
+  - {code: travel, name: Travel, keywords: [travel, tourism, destination, hotel]}
+  - {code: cinema, name: Cinema, keywords: [cinema, film, movie, actor, director]}
+  - {code: auto, name: Auto, keywords: [automotive, cars, car review, vehicle]}
+  - {code: beauty, name: Beauty, keywords: [beauty, skincare, makeup, cosmetics, hair]}
+  - {code: business, name: Business, keywords: [business, marketing, entrepreneur, finance, sales]}

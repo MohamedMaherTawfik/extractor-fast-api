@@ -33,6 +33,9 @@ class ProjectPaths:
     lead_raw: Path
     lead_exports: Path
     lead_control_imports: Path
+    creator_discovery: Path
+    creator_discovery_exports: Path
+    creator_discovery_imports: Path
     migrations: Path
     database_file: Path
     config_file: Path
@@ -68,6 +71,9 @@ class ProjectPaths:
             lead_raw=project_root / "data" / "lead_acquisition" / "raw",
             lead_exports=project_root / "data" / "lead_acquisition" / "exports",
             lead_control_imports=project_root / "data" / "imports" / "lead_control",
+            creator_discovery=project_root / "data" / "creator_discovery",
+            creator_discovery_exports=project_root / "data" / "creator_discovery" / "exports",
+            creator_discovery_imports=project_root / "data" / "imports" / "creator_discovery",
             migrations=migrations,
             database_file=database / "emy_private_ai_os.db",
             config_file=configs / "app.yaml",
@@ -97,6 +103,9 @@ class ProjectPaths:
             self.lead_raw,
             self.lead_exports,
             self.lead_control_imports,
+            self.creator_discovery,
+            self.creator_discovery_exports,
+            self.creator_discovery_imports,
             self.migrations,
         ):
             directory.mkdir(parents=True, exist_ok=True)

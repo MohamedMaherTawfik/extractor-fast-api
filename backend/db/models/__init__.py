@@ -77,6 +77,11 @@ from backend.db.models.leads import (
     Lead, LeadControlImport, LeadDedupeEvent, LeadJob, LeadRun, LeadSource,
     LeadSourceRecord, OptInLead,
 )
+from backend.db.models.creator_discovery import (
+    CreatorCandidate, CreatorContentSample, CreatorDiscoveryAccount,
+    CreatorDiscoveryAnalysis, CreatorDiscoveryJob, CreatorDiscoveryProfile,
+    CreatorDiscoveryRun, CreatorIndustry, CreatorMatchEvidence, CreatorSource,
+)
 
 __all__ = [
     "AnalysisResult",
@@ -155,6 +160,10 @@ __all__ = [
     "WebhookEvent",
     "LeadSource", "LeadRun", "LeadJob", "Lead", "LeadSourceRecord",
     "LeadDedupeEvent", "LeadControlImport", "OptInLead",
+    "CreatorDiscoveryRun", "CreatorDiscoveryJob", "CreatorCandidate",
+    "CreatorDiscoveryProfile", "CreatorDiscoveryAccount",
+    "CreatorContentSample", "CreatorDiscoveryAnalysis",
+    "CreatorMatchEvidence", "CreatorSource", "CreatorIndustry",
 ]
 from backend.db.models.analysis import (
     AnalysisResult,

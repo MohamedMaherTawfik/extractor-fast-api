@@ -1,6 +1,6 @@
 # EMY PRIVATE AI OS
 
-A local-first, private-first, portable, and modular AI operating-system project. The current backend covers Creator/Content collection and analysis, Pattern/Recipe, Rules, multimodal Generation, Product/Sales, Answer Bot/Customer Service, and governed business-lead acquisition over an Alembic-versioned SQLAlchemy/SQLite core.
+A local-first, private-first, portable, and modular AI operating-system project. The current backend covers Creator/Content collection and analysis, multi-platform Creator Discovery, Pattern/Recipe, Rules, multimodal Generation, Product/Sales, Answer Bot/Customer Service, and governed business-lead acquisition over an Alembic-versioned SQLAlchemy/SQLite core.
 
 ## Windows Setup
 
@@ -73,10 +73,14 @@ Normalized analysis can be mapped into versioned Content DNA, mined inside compa
 
 See docs/PATTERN_RECIPE_ENGINE.md for configuration, APIs, evidence, provenance, and causality constraints.
 
+## Creator Discovery Studio
+
+The dedicated Creator Discovery workspace accepts names, profile URLs, multiline input, CSV, and XLSX across seven selected platforms. It exposes connector capability states, review-first identity matching, unified profiles, evidence/provenance, server-paginated filtering, refresh, and exact-schema CSV/XLSX export. See `docs/CREATOR_DISCOVERY_STUDIO.md` for platform availability and limitations.
+
 ## Answer Bot
 
 The local Answer Bot normalizes conversations, grounds price/stock/order answers in Product/Sales, validates every draft, and auto-sends only low-risk responses through no-network adapters. Sensitive or uncertain cases are routed to human review. See docs/ANSWER_BOT.md for channels, safety, queues, follow-ups, knowledge, CRM signals, and sales drafts.
 
 ## Desktop UI development status
 
-The React/TypeScript operator control center, thin operator APIs, frontend tests, and Tauri 2 development configuration are present under `frontend/`. The browser development surface is verified. Native Tauri compilation remains blocked on this host until the Microsoft Visual C++ Build Tools and Windows SDK prerequisites are installed; therefore the Desktop UI project task remains open. See `docs/DESKTOP_UI.md`.
+The React/TypeScript operator control center, thin operator APIs, frontend tests, and Tauri 2 development configuration are present under `frontend/`. Browser and native Tauri development surfaces have been verified on this host. See `docs/DESKTOP_UI.md`.

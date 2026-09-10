@@ -1,6 +1,6 @@
 {
   "project": "EMY_PRIVATE_AI_OS",
-  "stage": "local_ai_video_generation_engine",
+  "stage": "creator_discovery_studio",
   "environment_ready": true,
   "active_task": null,
   "completed_modules": [
@@ -16,10 +16,13 @@
     "answer_bot",
     "desktop_ui",
     "lead_data_acquisition_engine",
-    "local_ai_video_generation_engine"
+    "local_ai_video_generation_engine",
+    "creator_discovery_studio"
   ],
   "next_task": "portable_production_runtime",
   "known_issues": [
+    "CREATOR_DISCOVERY_REFERENCE_WORKBOOK_NOT_FOUND: the supplied attachment contains the written schema but no XLSX file; exact written columns and sheet names are implemented and no workbook was modified",
+    "CREATOR_PLATFORM_APIS_NOT_CONFIGURED: YouTube Data API v3 support is implemented but has no configured key; Facebook, Instagram, TikTok, Snapchat, LinkedIn, and X require approved API integrations for automated name discovery and content sampling",
     "LEAD_CONTROL_WORKBOOK_NOT_FOUND: no EMY_Egypt_Lead_Acquisition_OS workbook is present; validated config defaults provide 78 keywords, 37 segments, and 27 governorates",
     "PAID_LEAD_SOURCES_NOT_CONFIGURED: Google Places and Foursquare adapters are interface-only, disabled, and have no configured credentials; no paid API request was made",
     "MASTER_CONTROL_FILE_NOT_FOUND: no EMY Creative Generation Master OS workbook is currently present; the preview/import interface is ready for a later project-relative file",

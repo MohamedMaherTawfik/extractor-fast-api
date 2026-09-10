@@ -1,0 +1,19 @@
+Set-Location -LiteralPath "D:\extractor-fast-api"
+.\.venv\Scripts\Activate.ps1
+.\scripts\start_backend.bat
+
+Set-Location -LiteralPath "D:\extractor-fast-api"
+.\.venv\Scripts\Activate.ps1
+Set-Location .\frontend
+npm run dev
+
+Start-Process "http://127.0.0.1:1420"
+Start-Process "http://127.0.0.1:8000/health"
+
+Get-NetTCPConnection -LocalPort 8000,1420 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ }
+
+Set-Location -LiteralPath "D:\extractor-fast-api"
+.\scripts\dev_desktop.ps1
+
+Get-Process -Name "emy-control-center" -ErrorAction SilentlyContinue | Stop-Process
+Write-Output "Recommended order: Backend → Frontend/Desktop → Browser/App"

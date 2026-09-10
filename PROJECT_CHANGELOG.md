@@ -1,5 +1,18 @@
 # Project Changelog
 
+## 2026-09-05 — Creator Discovery Studio 1.0.0 — PARTIAL LIVE COVERAGE
+
+- Added an isolated Creator Discovery domain without redesigning Lead Acquisition or the existing Creator, Content, Analysis, Generation, Product/Sales, Inventory, MSC, Answer Bot, Rules, or Video Studio modules.
+- Added seven capability-reporting connector classes, an official YouTube Data API v3 implementation, a robots-aware opt-in public metadata reader, and explicit `API_REQUIRED` / `MANUAL_URL_REQUIRED` states for unconfigured operations.
+- Added name, multiline, direct-profile URL, CSV, and XLSX input; multi-platform runs; URL-first cross-platform query handoff; bounded checkpoints; pause/resume/retry/cancel; and persistent errors/statuses.
+- Added deterministic evidence-weighted identity matching, human candidate review, exact-identity deduplication, explicit merge/keep-separate decisions, unified profiles, retained platform accounts, refresh discovery, provenance, and manual-correction history.
+- Added bounded public content samples, integration with Content Master and the Universal Content Analyzer, and a provider-neutral evidence-only creator analyzer for taxonomy, main platform, influence, mechanisms, KPI, and start-year fields. Unsupported values remain `UNKNOWN` or `NOT_AVAILABLE`.
+- Added Alembic revision `0011_creator_discovery` with ten normalized tables in the existing SQLite database, server-paginated/filterable APIs, exact 14-column standard CSV/XLSX mapping, opt-in X extension, and the required `EGYPT_MASSIVE_DUMP` / `INDUSTRY_SUMMARY` worksheets.
+- Added the dedicated desktop Creator Discovery workspace with New Discovery, Runs, Review Matches, Creators, Export, capability display, multi-platform selection, progress controls, review actions, detailed evidence/provenance/history, corrections, refresh, filters, and downloads.
+- The referenced XLSX was not included in the attachment or repository. No workbook was modified; compatibility is verified against the exact written sheet and column schema.
+- Real bounded smoke: `https://www.youtube.com/@mkbhd` with YouTube, Instagram, and X selected found and stored one robots-permitted public YouTube profile, produced a unified Technology profile, and exported one row to both required sheets. Instagram and X correctly returned `API_REQUIRED`; no content samples or unavailable metrics were invented.
+- Verification: 141 backend tests passed; 7 frontend files / 16 tests passed serially; TypeScript/Vite and native Tauri release builds passed; Alembic is at head with no schema drift; `pip check` and `git diff --check` passed. Broader platform automation remains partial until approved APIs/credentials are configured.
+
 ## 2026-09-03 — Local AI Video Generation Engine 1.0.0
 
 - Added an isolated `backend/generation/video_engine` extension without changing the existing contract-first Generation Engine, Lead Acquisition, Sales, MSC, Workbook, or desktop workspace implementations.

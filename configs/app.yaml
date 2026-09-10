@@ -38,6 +38,9 @@ run_live_messaging_tests: false
 messaging_privacy_mode: LOCAL_ONLY
 lead_acquisition_config_file: lead_acquisition.yaml
 lead_acquisition_version: 1.0.0
+creator_discovery_config_file: creator_discovery.yaml
+creator_discovery_version: 1.0.0
+run_live_creator_discovery_tests: false
 run_live_overture_tests: false
 run_live_osm_tests: false
 run_live_google_places_tests: false

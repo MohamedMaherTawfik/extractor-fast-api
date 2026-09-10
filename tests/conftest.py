@@ -52,12 +52,24 @@ from backend.db.models.leads import (
     Lead, LeadControlImport, LeadDedupeEvent, LeadJob, LeadRun, LeadSource,
     LeadSourceRecord, OptInLead,
 )
+from backend.db.models.creator_discovery import (
+    CreatorCandidate, CreatorContentSample, CreatorDiscoveryAccount,
+    CreatorDiscoveryAnalysis, CreatorDiscoveryJob, CreatorDiscoveryProfile,
+    CreatorDiscoveryRun, CreatorIndustry, CreatorMatchEvidence, CreatorSource,
+)
 from backend.db.session import init_database, session_scope
 from backend.main import app
 
 
 def clear_domain_data() -> None:
     with session_scope() as session:
+        for model in (
+            CreatorMatchEvidence, CreatorSource, CreatorDiscoveryAnalysis,
+            CreatorContentSample, CreatorDiscoveryAccount, CreatorCandidate,
+            CreatorDiscoveryJob, CreatorDiscoveryRun, CreatorDiscoveryProfile,
+            CreatorIndustry,
+        ):
+            session.execute(delete(model))
         for model in (LeadDedupeEvent, LeadSourceRecord, LeadJob, LeadRun, Lead, LeadControlImport, OptInLead, LeadSource):
             session.execute(delete(model))
         for model in (
@@ -139,6 +151,8 @@ def isolated_domain_data():
     existing_provider_responses = set(paths.provider_responses.rglob("*"))
     existing_lead_files = set(paths.lead_acquisition.rglob("*"))
     existing_lead_control_files = set(paths.lead_control_imports.rglob("*"))
+    existing_creator_discovery_files = set(paths.creator_discovery.rglob("*"))
+    existing_creator_discovery_imports = set(paths.creator_discovery_imports.rglob("*"))
     clear_domain_data()
     yield
     clear_domain_data()
@@ -150,6 +164,8 @@ def isolated_domain_data():
         (paths.provider_responses, existing_provider_responses),
         (paths.lead_acquisition, existing_lead_files),
         (paths.lead_control_imports, existing_lead_control_files),
+        (paths.creator_discovery, existing_creator_discovery_files),
+        (paths.creator_discovery_imports, existing_creator_discovery_imports),
     ):
         for created_path in sorted(
             set(base.rglob("*")) - existing,

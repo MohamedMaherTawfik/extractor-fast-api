@@ -10,5 +10,5 @@ export default defineConfig({
     strictPort: true,
     watch: { ignored: ["**/src-tauri/**"] },
   },
-  test: { environment: "jsdom", setupFiles: "./src/test/setup.ts", css: true, globals: true },
+  test: { environment: "jsdom", setupFiles: "./src/test/setup.ts", css: true, globals: true, maxWorkers: 1 },
 });
