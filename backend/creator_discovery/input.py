@@ -9,7 +9,10 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 
-NAME_HEADERS = ("Name", "Creator Name", "Account Name", "Creator", "Account")
+INPUT_HEADERS = (
+    "Profile URL", "URL", "Account URL",
+    "Creator Name", "Name", "Account Name", "Creator", "Account",
+)
 
 
 def parse_creator_input(filename: str, content: bytes, *, limit: int = 10_000) -> list[str]:
@@ -26,8 +29,10 @@ def _parse_csv(content: bytes, limit: int) -> list[str]:
     reader = csv.DictReader(StringIO(text))
     if not reader.fieldnames:
         raise ValueError("CSV input has no header row")
-    header = next((name for name in NAME_HEADERS if name in reader.fieldnames), reader.fieldnames[0])
-    return _bounded_unique((row.get(header) or "" for row in reader), limit)
+    headers = [name for name in INPUT_HEADERS if name in reader.fieldnames]
+    if not headers:
+        headers = [reader.fieldnames[0]]
+    return _bounded_unique((_first_value(row.get(header) for header in headers) for row in reader), limit)
 
 
 def _parse_xlsx(content: bytes, limit: int) -> list[str]:
@@ -38,8 +43,13 @@ def _parse_xlsx(content: bytes, limit: int) -> list[str]:
         headers = [str(value).strip() if value is not None else "" for value in next(rows, ())]
         if not headers:
             raise ValueError("XLSX input has no header row")
-        index = next((headers.index(name) for name in NAME_HEADERS if name in headers), 0)
-        return _bounded_unique((str(row[index]) if len(row) > index and row[index] is not None else "" for row in rows), limit)
+        indexes = [headers.index(name) for name in INPUT_HEADERS if name in headers]
+        if not indexes:
+            indexes = [0]
+        return _bounded_unique((
+            _first_value(str(row[index]) if len(row) > index and row[index] is not None else "" for index in indexes)
+            for row in rows
+        ), limit)
     finally:
         workbook.close()
 
@@ -58,4 +68,8 @@ def _bounded_unique(values, limit: int) -> list[str]:
     if not result:
         raise ValueError("Creator input contains no names or profile URLs")
     return result
+
+
+def _first_value(values) -> str:
+    return next((str(value).strip() for value in values if value is not None and str(value).strip()), "")
 

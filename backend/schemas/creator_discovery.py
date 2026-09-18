@@ -71,6 +71,8 @@ class CreatorAnalysisStatus(StrEnum):
 class CreatorDiscoveryRunRequest(BaseModel):
     inputs: list[str] = Field(min_length=1, max_length=10_000)
     platforms: list[DiscoveryPlatform] = Field(min_length=1, max_length=7)
+    mode: Literal["single", "bulk"] = "single"
+    auto_process: bool | None = None
     analyze_content: bool = True
     resolve_cross_platform_identity: bool = True
     update_existing_profiles: bool = False
@@ -90,6 +92,12 @@ class CreatorDiscoveryRunRequest(BaseModel):
     def unique_platforms(cls, values: list[DiscoveryPlatform]) -> list[DiscoveryPlatform]:
         return list(dict.fromkeys(values))
 
+    @model_validator(mode="after")
+    def default_bulk_automation(self) -> "CreatorDiscoveryRunRequest":
+        if self.auto_process is None:
+            self.auto_process = self.mode == "bulk"
+        return self
+
 
 class CreatorDiscoveryJobResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -102,6 +110,8 @@ class CreatorDiscoveryJobResponse(BaseModel):
     status: str
     attempt: int
     checkpoint: dict[str, Any]
+    stage: str = "PENDING"
+    progress_percent: float = 0
     candidate_count: int
     error: str | None
     started_at: datetime | None
@@ -120,6 +130,8 @@ class CreatorDiscoveryRunResponse(BaseModel):
     matched: int
     review_required: int
     failed: int
+    stage: str = "PENDING"
+    progress_percent: float = 0
     warnings: list[Any]
     errors: list[Any]
     started_at: datetime | None
@@ -189,8 +201,10 @@ class CreatorRefreshRequest(BaseModel):
 
 class CreatorExportRequest(BaseModel):
     format: Literal["csv", "xlsx"] = "xlsx"
+    template: Literal["standard", "intelligence"] = "standard"
     extended: bool = False
     creator_uids: list[str] = Field(default_factory=list, max_length=10_000)
+    run_uid: str | None = Field(default=None, max_length=64)
     platform: DiscoveryPlatform | None = None
     industry: str | None = None
     niche: str | None = None

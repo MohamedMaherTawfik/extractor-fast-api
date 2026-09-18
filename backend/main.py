@@ -11,6 +11,7 @@ from backend.api.errors import register_exception_handlers
 from backend.api.router import api_router
 from backend.core.config import get_settings
 from backend.core.logging import configure_logging
+from backend.creator_discovery.worker import creator_discovery_worker
 from backend.db.session import init_database
 
 
@@ -21,6 +22,7 @@ settings = get_settings()
 async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     init_database()
+    creator_discovery_worker.recover()
     getLogger(__name__).info("%s started in %s mode", settings.app_name, settings.environment)
     yield
 

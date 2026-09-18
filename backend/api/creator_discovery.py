@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from backend.core.config import get_settings
 from backend.creator_discovery.input import parse_creator_input
 from backend.creator_discovery.service import CreatorDiscoveryService
+from backend.creator_discovery.worker import enqueue_creator_discovery
 from backend.db.session import get_db
 from backend.schemas.creator_discovery import (
     CandidateDecisionRequest,
@@ -61,7 +62,11 @@ def industries(session: DatabaseSession):
 )
 def create_run(request: CreatorDiscoveryRunRequest, session: DatabaseSession):
     try:
-        return CreatorDiscoveryService(session).create_run(request)
+        run = CreatorDiscoveryService(session).create_run(request, defer_execution=True)
+        session.commit()
+        if request.execute:
+            enqueue_creator_discovery(run.run_uid)
+        return run
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -75,6 +80,8 @@ async def import_run(
     session: DatabaseSession,
     file: UploadFile = File(...),
     platforms: str = Form(...),
+    mode: str = Form("bulk"),
+    auto_process: bool = Form(True),
     analyze_content: bool = Form(True),
     resolve_cross_platform_identity: bool = Form(True),
     update_existing_profiles: bool = Form(False),
@@ -94,13 +101,19 @@ async def import_run(
         request = CreatorDiscoveryRunRequest(
             inputs=inputs,
             platforms=platform_values,
+            mode=mode,
+            auto_process=auto_process,
             analyze_content=analyze_content,
             resolve_cross_platform_identity=resolve_cross_platform_identity,
             update_existing_profiles=update_existing_profiles,
             content_sample_size=content_sample_size,
             execute=execute,
         )
-        return CreatorDiscoveryService(session).create_run(request)
+        run = CreatorDiscoveryService(session).create_run(request, defer_execution=True)
+        session.commit()
+        if request.execute:
+            enqueue_creator_discovery(run.run_uid)
+        return run
     except (ValueError, json.JSONDecodeError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -129,12 +142,18 @@ def pause_run(run_uid: str, session: DatabaseSession):
 
 @router.post("/creator-discovery/runs/{run_uid}/resume", response_model=CreatorDiscoveryRunResponse)
 def resume_run(run_uid: str, session: DatabaseSession):
-    return CreatorDiscoveryService(session).resume_run(run_uid)
+    run = CreatorDiscoveryService(session).resume_run(run_uid, defer_execution=True)
+    session.commit()
+    enqueue_creator_discovery(run_uid)
+    return run
 
 
 @router.post("/creator-discovery/runs/{run_uid}/retry", response_model=CreatorDiscoveryRunResponse)
 def retry_run(run_uid: str, session: DatabaseSession):
-    return CreatorDiscoveryService(session).retry_run(run_uid)
+    run = CreatorDiscoveryService(session).retry_run(run_uid, defer_execution=True)
+    session.commit()
+    enqueue_creator_discovery(run_uid)
+    return run
 
 
 @router.post("/creator-discovery/runs/{run_uid}/cancel", response_model=CreatorDiscoveryRunResponse)

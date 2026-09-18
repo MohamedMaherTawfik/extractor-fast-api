@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from io import BytesIO
+import re
 
 import httpx
 import pytest
+from openpyxl import load_workbook
 
 from backend.core.config import Settings
 from backend.creator_discovery.connectors import FacebookMetaConnector, InstagramMetaConnector
@@ -15,6 +18,7 @@ from backend.creator_discovery.service import CreatorDiscoveryService
 from backend.db.session import session_scope
 from backend.schemas.creator_discovery import (
     CandidateDecisionRequest,
+    CreatorExportRequest,
     CreatorDiscoveryRunRequest,
     CreatorRefreshRequest,
     DiscoveryPlatform,
@@ -223,3 +227,124 @@ def test_meta_refresh_updates_existing_profile_without_duplication():
         assert refreshed["platform_accounts"][0]["followers"] == 6200
         assert len(refreshed["content_samples"]) == 1
         assert refreshed["refresh_status"]["instagram"] == "FOUND"
+
+
+def test_five_instagram_urls_collect_analyze_export_and_repair_identity_only_account():
+    usernames = [f"beauty_creator_{index}" for index in range(1, 6)]
+
+    def invalid_handler(request):
+        if request.url.path.endswith("/debug_token"):
+            return _json({"data": {"is_valid": False, "app_id": "app-123"}})
+        raise AssertionError(f"Unexpected Meta request: {request.url}")
+
+    def valid_bulk_handler(request):
+        path = request.url.path
+        fields = request.url.params.get("fields", "")
+        if path.endswith("/debug_token"):
+            return _json({"data": {
+                "is_valid": True,
+                "app_id": "app-123",
+                "expires_at": int(datetime(2030, 1, 1, tzinfo=UTC).timestamp()),
+                "scopes": ["instagram_basic", "pages_read_engagement", "pages_show_list"],
+            }})
+        if path.endswith("/ig-1") and fields == "id,username,name":
+            return _json({"id": "ig-1", "username": "connected_account", "name": "Connected Account"})
+        if path.endswith("/ig-1") and fields.startswith("id,username,name,biography"):
+            return _json({"id": "ig-1", "username": "connected_account", "name": "Connected Account"})
+        if path.endswith("/ig-1") and "business_discovery.username" in fields:
+            match = re.search(r"business_discovery\.username\(([^)]+)\)", fields)
+            assert match is not None
+            username = match.group(1)
+            if "media.limit" in fields:
+                return _json({"business_discovery": {"media": {"data": [
+                    {
+                        "id": f"{username}-media-{index}",
+                        "caption": f"Skincare tutorial tips — follow for more #skincare #beauty {index}",
+                        "media_type": "IMAGE",
+                        "media_url": f"https://cdn.example/{username}-{index}.jpg",
+                        "permalink": f"https://www.instagram.com/p/{username}-{index}/",
+                        "timestamp": f"2026-08-0{index}T12:00:00+0000",
+                        "like_count": 6500,
+                        "comments_count": 150,
+                    }
+                    for index in range(1, 4)
+                ]}}})
+            creator_index = int(username.rsplit("_", 1)[1])
+            return _json({"business_discovery": {
+                "id": f"ig-{creator_index + 10}",
+                "username": username,
+                "name": f"Beauty Creator {creator_index}",
+                "biography": "Beauty, skincare tutorials, makeup tips, and product reviews.",
+                "followers_count": 100_000 + creator_index,
+                "follows_count": 200 + creator_index,
+                "media_count": 300 + creator_index,
+                "profile_picture_url": f"https://cdn.example/{username}.jpg",
+            }})
+        raise AssertionError(f"Unexpected Meta request: {request.url}")
+
+    invalid_meta = _client(invalid_handler)
+    invalid_registry = CreatorDiscoveryConnectorRegistry(connectors=[InstagramMetaConnector(invalid_meta)])
+    valid_meta = _client(valid_bulk_handler, meta_facebook_page_id=None)
+    valid_registry = CreatorDiscoveryConnectorRegistry(connectors=[InstagramMetaConnector(valid_meta)])
+
+    with session_scope() as session:
+        invalid_service = CreatorDiscoveryService(session, connectors=invalid_registry)
+        first_run = invalid_service.create_run(CreatorDiscoveryRunRequest(
+            inputs=[f"https://www.instagram.com/{usernames[0]}"],
+            platforms=[DiscoveryPlatform.INSTAGRAM],
+            mode="bulk",
+            auto_process=True,
+            analyze_content=True,
+        ))
+        assert first_run.status == "PARTIAL"
+        identity_only = invalid_service.list_profiles(offset=0, limit=10, include_export_fields=True)["items"][0]
+        assert identity_only["followers"] is None
+        assert identity_only["analysis_status"] == "TOKEN_INVALID"
+
+        service = CreatorDiscoveryService(session, connectors=valid_registry)
+        run = service.create_run(CreatorDiscoveryRunRequest(
+            inputs=[f"https://www.instagram.com/{username}" for username in usernames],
+            platforms=[DiscoveryPlatform.INSTAGRAM],
+            mode="bulk",
+            auto_process=True,
+            analyze_content=True,
+            update_existing_profiles=False,
+            content_sample_size=10,
+        ))
+        assert run.status == "COMPLETED", [
+            (job.status, job.error, job.checkpoint) for job in run.jobs
+        ]
+        assert run.processed == 5 and run.matched == 5 and run.review_required == 0
+
+        page = service.list_profiles(offset=0, limit=10, include_export_fields=True)
+        assert page["total"] == 5
+        for row in page["items"]:
+            assert row["followers"] is not None
+            assert row["following"] is not None
+            assert row["content_count"] is not None
+            assert row["bio"]
+            assert row["industry"] != "UNKNOWN"
+            assert row["niche"] != "UNKNOWN"
+            assert row["content_type"] == "IMAGE"
+            assert row["content_angle"] != "UNKNOWN"
+            assert row["content_style"] != "UNKNOWN"
+            assert row["visual_style"] == "Static image-led"
+            assert row["cta"] == "subscribe"
+            assert row["engagement"] != "UNKNOWN"
+            assert row["audience_analysis"] != "UNKNOWN"
+            assert row["trend_analysis"] != "UNKNOWN"
+            assert row["ai_recommendation"] != "INSUFFICIENT_EVIDENCE"
+            assert row["campaign_idea"] != "INSUFFICIENT_EVIDENCE"
+            assert row["kpi_impact"] != "UNKNOWN"
+
+            profile = service.repository.get_profile_by_creator_uid(row["creator_uid"])
+            assert profile is not None
+            assert len(service.repository.samples_for_creator(profile.creator_id)) == 3
+            assert len(service.repository.analyses_for_profile(profile.id)) >= 1
+
+        payload, _, _ = service.export(CreatorExportRequest(format="xlsx", run_uid=run.run_uid))
+        sheet = load_workbook(BytesIO(payload))["Creator Discovery"]
+        assert sheet.max_row == 6
+        assert all(sheet.cell(row=index, column=5).value for index in range(2, 7))
+        assert all(sheet.cell(row=index, column=10).value != "UNKNOWN" for index in range(2, 7))
+        assert all(sheet.cell(row=index, column=21).value != "INSUFFICIENT_EVIDENCE" for index in range(2, 7))

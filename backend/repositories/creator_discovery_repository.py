@@ -69,7 +69,7 @@ class CreatorDiscoveryRepository:
         return int(self.session.scalar(
             select(func.count()).select_from(CreatorDiscoveryJob).where(
                 CreatorDiscoveryJob.run_id == run_id,
-                CreatorDiscoveryJob.status.in_(["PENDING", "FAILED"]),
+                CreatorDiscoveryJob.status == "PENDING",
             )
         ) or 0)
 
@@ -116,7 +116,9 @@ class CreatorDiscoveryRepository:
             filters.append(CreatorDiscoveryRun.run_uid == run_uid)
         if platform:
             filters.append(CreatorCandidate.platform == platform)
-        if review_status:
+        if review_status == "OPEN":
+            filters.append(CreatorCandidate.review_status.in_(["PENDING", "EXCEPTION"]))
+        elif review_status:
             filters.append(CreatorCandidate.review_status == review_status)
         if classification:
             filters.append(CreatorCandidate.classification == classification)
@@ -200,6 +202,16 @@ class CreatorDiscoveryRepository:
             statement.order_by(Creator.updated_at.desc(), Creator.id.desc()).offset(offset).limit(limit)
         ).all())
         return rows, total
+
+    def creator_uids_for_run(self, run_uid: str) -> list[str]:
+        return list(self.session.scalars(
+            select(Creator.creator_uid)
+            .join(CreatorCandidate, CreatorCandidate.creator_id == Creator.id)
+            .join(CreatorDiscoveryRun, CreatorDiscoveryRun.id == CreatorCandidate.run_id)
+            .where(CreatorDiscoveryRun.run_uid == run_uid, CreatorCandidate.creator_id.is_not(None))
+            .distinct()
+            .order_by(Creator.creator_uid)
+        ))
 
     def find_account(self, platform: str, profile_url: str) -> CreatorDiscoveryAccount | None:
         return self.session.scalar(select(CreatorDiscoveryAccount).where(

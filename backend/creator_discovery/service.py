@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from collections.abc import Callable
 from typing import Any
 from uuid import uuid4
 
@@ -19,7 +20,7 @@ from backend.creator_discovery.connectors import (
     DiscoveredContent,
 )
 from backend.creator_discovery.meta import MetaApiError
-from backend.creator_discovery.export import build_csv, build_xlsx
+from backend.creator_discovery.export import build_creator_intelligence_xlsx, build_csv, build_xlsx
 from backend.creator_discovery.matching import IdentityMatcher
 from backend.creator_discovery.normalization import normalize_creator_name, normalize_discovery_input
 from backend.creator_discovery.quality import (
@@ -73,7 +74,7 @@ class CreatorDiscoveryService:
     def meta_connection_status(self, *, force: bool = False) -> dict[str, Any]:
         return self.connectors.meta_status(force=force)
 
-    def create_run(self, request: CreatorDiscoveryRunRequest):
+    def create_run(self, request: CreatorDiscoveryRunRequest, *, defer_execution: bool = False):
         if len(request.inputs) > self.config.execution.max_inputs_per_run:
             raise ValueError(f"A run supports at most {self.config.execution.max_inputs_per_run} inputs")
         run = self.repository.create_run({
@@ -108,11 +109,14 @@ class CreatorDiscoveryService:
                 "run_id": run.id,
                 "input_value": value,
                 "platforms": job_platforms,
-                "checkpoint": {"platform_index": 0, "platform_status": {}},
+                "checkpoint": {
+                    "platform_index": 0, "platform_status": {},
+                    "stage": "PENDING", "progress_percent": 0,
+                },
                 **values,
             })
         self._refresh_run_counts(run)
-        if request.execute:
+        if request.execute and not defer_execution:
             self._execute(run)
         return self.repository.get_run(run.run_uid)
 
@@ -134,22 +138,30 @@ class CreatorDiscoveryService:
         self.session.flush()
         return run
 
-    def resume_run(self, run_uid: str):
+    def resume_run(self, run_uid: str, *, defer_execution: bool = False):
         run = self.get_run(run_uid)
         if run.status == "CANCELLED":
             raise ConflictError("Cancelled runs cannot be resumed")
-        self._execute(run)
+        run.status = "PENDING"
+        if not defer_execution:
+            self._execute(run)
         return self.repository.get_run(run_uid)
 
-    def retry_run(self, run_uid: str):
+    def retry_run(self, run_uid: str, *, defer_execution: bool = False):
         run = self.get_run(run_uid)
         for job in run.jobs:
-            if job.status == "FAILED":
+            if job.status in {"FAILED", "PARTIAL"}:
                 job.status = "PENDING"
                 job.error = None
+                job.checkpoint = {
+                    **(job.checkpoint or {}), "platform_index": 0,
+                    "stage": "PENDING", "progress_percent": 0,
+                }
         run.completed_at = None
+        run.status = "PENDING"
         self.session.flush()
-        self._execute(run)
+        if not defer_execution:
+            self._execute(run)
         return self.repository.get_run(run_uid)
 
     def cancel_run(self, run_uid: str):
@@ -177,11 +189,21 @@ class CreatorDiscoveryService:
         )
         return {"items": rows, "total": total, "offset": offset, "limit": limit}
 
-    def confirm_candidate(self, candidate_uid: str, decision: CandidateDecisionRequest) -> dict[str, Any]:
+    def confirm_candidate(
+        self,
+        candidate_uid: str,
+        decision: CandidateDecisionRequest,
+        *,
+        progress_callback: Callable[[str, float], None] | None = None,
+        return_detail: bool = True,
+    ) -> dict[str, Any]:
         candidate = self._candidate(candidate_uid)
         if candidate.review_status in {"CONFIRMED", "MERGED", "KEPT_SEPARATE"} and candidate.creator_id:
             profile = self.repository.get_profile_by_creator(candidate.creator_id)
-            return self.profile_detail(profile.profile_uid)  # type: ignore[union-attr]
+            if return_detail:
+                return self.profile_detail(profile.profile_uid)  # type: ignore[union-attr]
+            creator = self.session.get(Creator, candidate.creator_id)
+            return {"unified_profile": {"creator_uid": creator.creator_uid}}  # type: ignore[union-attr]
         run = self.repository.get_run(candidate.run_id)
         options = (run.options if run else {}) or {}
         existing_account = self.repository.find_account(candidate.platform, candidate.profile_url)
@@ -237,6 +259,8 @@ class CreatorDiscoveryService:
         candidate.classification = "CONFIRMED"
         self._record_candidate_sources(profile, candidate)
         if options.get("analyze_content", True):
+            if progress_callback:
+                progress_callback("FETCHING_CONTENT", 30)
             connector = self.connectors.get(candidate.platform)
             discovered = DiscoveredCandidate(
                 platform=DiscoveryPlatform(candidate.platform), profile_url=candidate.profile_url,
@@ -258,9 +282,15 @@ class CreatorDiscoveryService:
             for sample in samples:
                 self._persist_sample(creator, account, sample)
         self._refresh_collection_state(profile)
+        if progress_callback:
+            progress_callback("ANALYZING_CONTENT", 60)
         self._reanalyze(profile, execute=bool(options.get("analyze_content", True)))
+        if progress_callback:
+            progress_callback("BUILDING_INTELLIGENCE", 80)
         self.session.flush()
-        return self.profile_detail(profile.profile_uid)
+        if return_detail:
+            return self.profile_detail(profile.profile_uid)
+        return {"unified_profile": {"creator_uid": creator.creator_uid}}
 
     def reject_candidate(self, candidate_uid: str) -> CreatorCandidate:
         candidate = self._candidate(candidate_uid)
@@ -272,12 +302,15 @@ class CreatorDiscoveryService:
             self._refresh_run_counts(run)
         return candidate
 
-    def list_profiles(self, **filters: Any) -> dict[str, Any]:
+    def list_profiles(self, *, include_export_fields: bool = False, **filters: Any) -> dict[str, Any]:
         offset = int(filters.pop("offset"))
         limit = int(filters.pop("limit"))
         rows, total = self.repository.list_profiles(offset=offset, limit=limit, **filters)
         return {
-            "items": [self._profile_summary(profile, creator) for profile, creator in rows],
+            "items": [
+                self._profile_summary(profile, creator, include_export_fields=include_export_fields)
+                for profile, creator in rows
+            ],
             "total": total,
             "offset": offset,
             "limit": limit,
@@ -310,7 +343,7 @@ class CreatorDiscoveryService:
             "match_evidence": [self._candidate_payload(item) for item in candidates],
             "provenance": [self._source_payload(item) for item in sources],
             "history": profile.history,
-            "meta_connector_status": self.meta_connection_status(),
+            "meta_connector_status": self.meta_connection_status() if meta_accounts else None,
             "identity_match": {
                 "status": profile.identity_status,
                 "confidence": profile.match_confidence,
@@ -424,6 +457,17 @@ class CreatorDiscoveryService:
         rows: list[dict[str, Any]] = []
         offset = 0
         batch_size = 5_000
+        creator_uids = request.creator_uids or None
+        if request.run_uid:
+            if self.repository.get_run(request.run_uid) is None:
+                raise NotFoundError(f"Creator discovery run {request.run_uid} was not found")
+            run_creator_uids = self.repository.creator_uids_for_run(request.run_uid)
+            creator_uids = (
+                sorted(set(creator_uids) & set(run_creator_uids))
+                if creator_uids else run_creator_uids
+            )
+            if not creator_uids:
+                creator_uids = ["__NO_CREATOR_IN_RUN__"]
         while True:
             page = self.list_profiles(
                 offset=offset, limit=batch_size,
@@ -432,7 +476,8 @@ class CreatorDiscoveryService:
                 influence_min=request.influence_min, influence_max=request.influence_max,
                 match_confidence_min=request.match_confidence_min,
                 analysis_status=request.analysis_status, start_year=request.start_year,
-                creator_uids=request.creator_uids or None,
+                creator_uids=creator_uids,
+                include_export_fields=True,
             )
             rows.extend(page["items"])
             if len(page["items"]) < batch_size:
@@ -440,14 +485,38 @@ class CreatorDiscoveryService:
             offset += len(page["items"])
         if request.format == "csv":
             return build_csv(rows, extended=request.extended), "text/csv; charset=utf-8", "creator_discovery.csv"
+        if request.template == "intelligence":
+            records = []
+            for item in rows:
+                profile = self.repository.get_profile_by_creator_uid(item["creator_uid"])
+                if profile is None:
+                    continue
+                analyses = self.repository.analyses_for_profile(profile.id)
+                records.append({
+                    "profile": item,
+                    "accounts": [self._account_payload(value) for value in self.repository.accounts_for_creator(profile.creator_id)],
+                    "samples": [self._sample_payload(value) for value in self.repository.samples_for_creator(profile.creator_id)],
+                    "analysis": analyses[0].output if analyses else {},
+                    "sources": [self._source_payload(value) for value in self.repository.sources_for_profile(profile.id)],
+                })
+            return (
+                build_creator_intelligence_xlsx(records),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "creator_intelligence_report.xlsx",
+            )
         return (
             build_xlsx(rows, extended=request.extended),
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "creator_discovery.xlsx",
+            "creator_discovery_export.xlsx",
         )
 
     def industries(self) -> list[dict[str, Any]]:
         return [{"code": item.code, "name": item.name, "aliases": item.aliases} for item in self.repository.list_industries()]
+
+    def execute_run(self, run_uid: str):
+        run = self.get_run(run_uid)
+        self._execute(run)
+        return self.repository.get_run(run_uid)
 
     def _execute(self, run) -> None:
         if run.status == "CANCELLED":
@@ -455,12 +524,14 @@ class CreatorDiscoveryService:
         run.status = "RUNNING"
         run.started_at = run.started_at or utc_now()
         run.completed_at = None
-        self.session.flush()
+        self.session.commit()
         jobs = self.repository.pending_jobs(run.id, self.config.execution.max_inline_jobs)
         for job in jobs:
+            self.session.refresh(run)
             if run.status == "PAUSED":
                 break
             self._process_job(run, job)
+            self.session.commit()
         self._refresh_run_counts(run)
         remaining = self.repository.remaining_jobs(run.id)
         if remaining and run.status != "PAUSED":
@@ -484,11 +555,15 @@ class CreatorDiscoveryService:
         job.attempt += 1
         job.started_at = utc_now()
         job.error = None
-        self.session.flush()
+        self._set_job_progress(job, "FETCHING_PROFILE", 10)
+        # Publish the first durable checkpoint before connector I/O so polling
+        # clients immediately see which creator and stage are running.
+        self.session.commit()
         try:
             normalized = normalize_discovery_input(job.input_value)
             statuses = dict(job.checkpoint.get("platform_status") or {})
             resolved_name = job.checkpoint.get("resolved_name")
+            resolved_creator_uid = job.checkpoint.get("creator_uid")
             start = int(job.checkpoint.get("platform_index", 0))
             for index, platform_name in enumerate(job.platforms[start:], start=start):
                 connector = self.connectors.get(platform_name)
@@ -505,9 +580,43 @@ class CreatorDiscoveryService:
                 if outcome.status == "FOUND" and requirements:
                     statuses[platform_name] = sorted(requirements)[0]
                 if outcome.errors:
-                    run.errors = [*run.errors, {"job_uid": job.job_uid, "platform": platform_name, "errors": outcome.errors}]
+                    run.errors = [
+                        *run.errors,
+                        *[
+                            {
+                                "job_uid": job.job_uid,
+                                "platform": platform_name,
+                                "stage": "FETCHING_PROFILE",
+                                "error_type": "CONNECTOR_ERROR",
+                                "message": str(message)[:500],
+                                "timestamp": utc_now().isoformat(),
+                            }
+                            for message in outcome.errors
+                        ],
+                    ]
+                created_candidates: list[CreatorCandidate] = []
                 for raw in outcome.candidates:
-                    if self.repository.existing_candidate(run.id, raw.platform.value, raw.profile_url):
+                    existing = self.repository.existing_candidate(run.id, raw.platform.value, raw.profile_url)
+                    if existing is not None:
+                        for field, value in (
+                            ("display_name", raw.display_name), ("username", raw.username),
+                            ("public_bio", raw.public_bio), ("public_avatar_url", raw.public_avatar_url),
+                            ("followers", raw.followers), ("following", raw.following),
+                            ("content_count", raw.content_count), ("verified", raw.verified),
+                            ("source_id", raw.source_id),
+                        ):
+                            if value is not None:
+                                setattr(existing, field, value)
+                        existing.discovery_source = raw.discovery_source
+                        existing.data_collection_status = raw.data_collection_status
+                        existing.data_completeness = raw.data_completeness
+                        existing.connector_requirement = raw.connector_requirement
+                        existing.profile_data = {**existing.profile_data, **raw.profile_data}
+                        existing.provenance = [*existing.provenance, *raw.provenance]
+                        if run.options.get("auto_process", False):
+                            existing.review_status = "PENDING"
+                            existing.classification = "CONFIRMED"
+                        created_candidates.append(existing)
                         continue
                     direct_candidate = direct and normalized.url == raw.profile_url
                     if direct_candidate and raw.display_name:
@@ -540,22 +649,49 @@ class CreatorDiscoveryService:
                             "signal": signal.signal, "score": signal.score, "weight": signal.weight,
                             "contribution": signal.contribution, "evidence": signal.evidence,
                         })
+                    created_candidates.append(candidate)
                     job.candidate_count += 1
+                if run.options.get("auto_process", False) and created_candidates:
+                    self._checkpoint_job(job, "FETCHING_CONTENT", 30, creator_name=resolved_name)
+                    resolved_creator_uid = self._auto_process_candidates(
+                        created_candidates,
+                        creator_uid=resolved_creator_uid,
+                        resolve_cross_platform=bool(run.options.get("resolve_cross_platform_identity", True)),
+                        progress_callback=lambda stage, value: self._checkpoint_job(
+                            job, stage, value, creator_name=resolved_name,
+                        ),
+                    )
+                    if resolved_creator_uid is None:
+                        statuses[platform_name] = "NO_CONFIDENT_MATCH"
                 job.checkpoint = {
                     "platform_index": index + 1,
                     "platform_status": statuses,
                     "resolved_name": resolved_name,
+                    "creator_uid": resolved_creator_uid,
                 }
                 self.session.flush()
             partial_states = {
                 "IDENTITY_RESOLVED", "DATA_COLLECTION_REQUIRED", "API_REQUIRED",
                 "MANUAL_URL_REQUIRED", "NOT_CONFIGURED", "NOT_AVAILABLE", "API_ERROR",
+                "NO_CONFIDENT_MATCH", "TOKEN_INVALID", "TOKEN_EXPIRED",
+                "PERMISSION_MISSING", "ACCOUNT_NOT_LINKED", "ACCOUNT_NOT_ACCESSIBLE",
+                "RATE_LIMITED", "API_UNAVAILABLE",
             }
+            self._set_job_progress(job, "EXPORTING", 95, creator_name=resolved_name)
             job.status = "PARTIAL" if any(value in partial_states for value in statuses.values()) else "COMPLETED"
+            self._set_job_progress(job, job.status, 100, creator_name=resolved_name)
         except Exception as exc:
             job.status = "FAILED"
             job.error = str(exc)[:500]
-            run.errors = [*run.errors, {"job_uid": job.job_uid, "error": str(exc)[:500]}]
+            error = {
+                "job_uid": job.job_uid,
+                "stage": str((job.checkpoint or {}).get("stage") or "UNKNOWN"),
+                "error_type": type(exc).__name__,
+                "message": str(exc)[:500],
+                "timestamp": utc_now().isoformat(),
+            }
+            run.errors = [*run.errors, error]
+            self._set_job_progress(job, "FAILED", 100)
         finally:
             job.completed_at = utc_now()
             self.session.flush()
@@ -568,7 +704,8 @@ class CreatorDiscoveryService:
         run.failed = sum(job.status == "FAILED" for job in jobs)
         run.review_required = int(self.session.scalar(
             select(func.count()).select_from(CreatorCandidate).where(
-                CreatorCandidate.run_id == run.id, CreatorCandidate.review_status == "PENDING"
+                CreatorCandidate.run_id == run.id,
+                CreatorCandidate.review_status.in_(["PENDING", "EXCEPTION"]),
             )
         ) or 0)
 
@@ -577,6 +714,68 @@ class CreatorDiscoveryService:
         if candidate is None:
             raise NotFoundError(f"Creator candidate {candidate_uid} was not found")
         return candidate
+
+    def _auto_process_candidates(
+        self,
+        candidates: list[CreatorCandidate],
+        *,
+        creator_uid: str | None,
+        resolve_cross_platform: bool,
+        progress_callback: Callable[[str, float], None] | None = None,
+    ) -> str | None:
+        eligible = [
+            item for item in candidates
+            if item.classification in {"CONFIRMED", "HIGH_CONFIDENCE"}
+        ]
+        if not eligible:
+            for item in candidates:
+                item.review_status = "EXCEPTION"
+            return creator_uid
+
+        winner = max(eligible, key=lambda item: (item.confidence, item.data_completeness))
+        existing_account = self.repository.find_account(winner.platform, winner.profile_url)
+        should_merge = bool(creator_uid and resolve_cross_platform and existing_account is None)
+        decision = CandidateDecisionRequest(
+            action="MERGE" if should_merge else "THIS_IS_THE_ACCOUNT",
+            creator_uid=creator_uid if should_merge else None,
+        )
+        detail = self.confirm_candidate(
+            winner.candidate_uid, decision, progress_callback=progress_callback,
+            return_detail=False,
+        )
+        for item in candidates:
+            if item.id != winner.id and item.review_status == "PENDING":
+                item.review_status = "REJECTED"
+        return str(detail["unified_profile"]["creator_uid"])
+
+    @staticmethod
+    def _set_job_progress(
+        job,
+        stage: str,
+        progress_percent: float,
+        *,
+        creator_name: str | None = None,
+    ) -> None:
+        job.checkpoint = {
+            **(job.checkpoint or {}),
+            "stage": stage,
+            "progress_percent": max(0.0, min(float(progress_percent), 100.0)),
+            "current_creator": creator_name or (job.checkpoint or {}).get("current_creator"),
+            "stage_updated_at": utc_now().isoformat(),
+        }
+
+    def _checkpoint_job(
+        self,
+        job,
+        stage: str,
+        progress_percent: float,
+        *,
+        creator_name: str | None = None,
+    ) -> None:
+        self._set_job_progress(
+            job, stage, progress_percent, creator_name=creator_name,
+        )
+        self.session.commit()
 
     def _new_creator(self, candidate: CreatorCandidate) -> Creator:
         name = candidate.display_name or candidate.username or candidate.profile_url
@@ -602,25 +801,30 @@ class CreatorDiscoveryService:
         if account is not None:
             if account.creator_id != creator.id:
                 raise ConflictError("The exact platform profile is already attached to another creator")
-            if update_existing:
-                for field, candidate_field in (
-                    ("display_name", "display_name"), ("username", "username"), ("followers", "followers"),
-                    ("following", "following"), ("content_count", "content_count"),
-                    ("bio", "public_bio"), ("verified", "verified"),
-                    ("source_id", "source_id"),
-                ):
-                    value = getattr(candidate, candidate_field)
-                    if value is not None:
-                        setattr(account, field, value)
+            for field, candidate_field in (
+                ("display_name", "display_name"), ("username", "username"), ("followers", "followers"),
+                ("following", "following"), ("content_count", "content_count"),
+                ("bio", "public_bio"), ("verified", "verified"),
+                ("source_id", "source_id"),
+            ):
+                value = getattr(candidate, candidate_field)
+                if value is not None and (update_existing or getattr(account, field) is None):
+                    setattr(account, field, value)
+
+            # A successful connector response must be allowed to repair an earlier
+            # identity-only record. ``update_existing_profiles`` controls overwrites;
+            # it must not prevent filling fields that were never collected.
+            authoritative = candidate.discovery_source != "operator_supplied_url"
+            if update_existing or authoritative:
                 account.source = candidate.discovery_source
                 account.confidence = max(account.confidence, candidate.confidence)
                 account.identity_status = candidate.identity_status
                 account.data_collection_status = candidate.data_collection_status
                 account.data_completeness = candidate.data_completeness
                 account.connector_requirement = candidate.connector_requirement
-                account.metadata_json = {**account.metadata_json, **candidate.profile_data}
-                account.provenance = [*account.provenance, *candidate.provenance]
-                account.last_seen_at = utc_now()
+            account.metadata_json = {**account.metadata_json, **candidate.profile_data}
+            account.provenance = [*account.provenance, *candidate.provenance]
+            account.last_seen_at = utc_now()
         else:
             account = self.repository.create_account({
                 "account_uid": f"CDA_{uuid4().hex.upper()}", "creator_id": creator.id,
@@ -665,18 +869,22 @@ class CreatorDiscoveryService:
         if matches:
             if any(item.creator_id != creator.id for item in matches):
                 raise ConflictError("The normalized platform identity belongs to another Creator Master record")
-            if update_existing:
-                values = {
-                    "display_name": candidate.display_name,
-                    "bio": candidate.public_bio,
-                    "followers_count": candidate.followers,
-                    "following_count": candidate.following,
-                    "content_count": candidate.content_count,
-                    "verified": candidate.verified,
-                }
-                self.core_accounts.update(
-                    matches[0], {field: value for field, value in values.items() if value is not None},
-                )
+            values = {
+                "display_name": candidate.display_name,
+                "bio": candidate.public_bio,
+                "followers_count": candidate.followers,
+                "following_count": candidate.following,
+                "content_count": candidate.content_count,
+                "verified": candidate.verified,
+            }
+            core_account = matches[0]
+            changes = {
+                field: value
+                for field, value in values.items()
+                if value is not None and (update_existing or getattr(core_account, field) is None)
+            }
+            if changes:
+                self.core_accounts.update(core_account, changes)
             return
         self.core_accounts.create(creator.id, {
             "platform": platform, "username": normalized.username,
@@ -843,7 +1051,9 @@ class CreatorDiscoveryService:
     def _record_candidate_sources(self, profile: CreatorDiscoveryProfile, candidate: CreatorCandidate) -> None:
         for field, value in (
             (f"{candidate.platform}_url", candidate.profile_url), ("name", candidate.display_name),
-            ("followers", candidate.followers), ("bio", candidate.public_bio),
+            ("username", candidate.username), ("followers", candidate.followers),
+            ("following", candidate.following), ("content_count", candidate.content_count),
+            ("bio", candidate.public_bio), ("verified", candidate.verified),
         ):
             if value is None:
                 continue
@@ -861,9 +1071,15 @@ class CreatorDiscoveryService:
             for item in self.config.industry_taxonomy
         ])
 
-    def _profile_summary(self, profile: CreatorDiscoveryProfile, creator: Creator) -> dict[str, Any]:
+    def _profile_summary(
+        self,
+        profile: CreatorDiscoveryProfile,
+        creator: Creator,
+        *,
+        include_export_fields: bool = False,
+    ) -> dict[str, Any]:
         accounts = self.repository.accounts_for_creator(creator.id)
-        return {
+        summary = {
             "profile_uid": profile.profile_uid, "creator_uid": creator.creator_uid,
             "name": creator.display_name, "normalized_name": profile.normalized_name,
             "niche": profile.niche, "industry": profile.industry,
@@ -884,6 +1100,46 @@ class CreatorDiscoveryService:
             "possible_duplicate": creator.possible_duplicate,
             "created_at": profile.created_at.isoformat(), "updated_at": profile.updated_at.isoformat(),
         }
+        if include_export_fields:
+            main_platform = (profile.main_platform or "").casefold()
+            main_account = next(
+                (item for item in accounts if item.platform.casefold() == main_platform),
+                None,
+            )
+            if main_account is None and accounts:
+                main_account = max(
+                    accounts,
+                    key=lambda item: (item.followers or -1, item.content_count or -1, item.confidence),
+                )
+            analyses = self.repository.analyses_for_profile(profile.id)
+            intelligence = analyses[0].output if analyses else {}
+            summary.update({
+                "username": main_account.username if main_account else None,
+                "platform": main_account.platform if main_account else profile.main_platform,
+                "profile_url": main_account.profile_url if main_account else None,
+                "followers": main_account.followers if main_account else None,
+                "following": main_account.following if main_account else None,
+                "content_count": main_account.content_count if main_account else None,
+                "bio": main_account.bio if main_account else None,
+                "verified": main_account.verified if main_account else None,
+                "content_type": intelligence.get("content_type", "UNKNOWN"),
+                "content_angle": intelligence.get("content_angle", "UNKNOWN"),
+                "content_style": intelligence.get("content_style", profile.content_mechanism_style),
+                "visual_style": intelligence.get("visual_style", "UNKNOWN"),
+                "cta": intelligence.get("cta_analysis", "UNKNOWN"),
+                "engagement": intelligence.get("engagement_pattern", "UNKNOWN"),
+                "audience_analysis": intelligence.get("audience_analysis", "UNKNOWN"),
+                "trend_analysis": intelligence.get("trend_analysis", "UNKNOWN"),
+                "ai_recommendation": intelligence.get("ai_recommendation", "INSUFFICIENT_EVIDENCE"),
+                "personalization": intelligence.get("personalization", "INSUFFICIENT_EVIDENCE"),
+                "campaign_idea": intelligence.get("campaign_idea", "INSUFFICIENT_EVIDENCE"),
+                "creative_strategy": intelligence.get("creative_strategy", "INSUFFICIENT_EVIDENCE"),
+                "community_impact": intelligence.get("community_impact", "UNKNOWN"),
+                "source": main_account.source if main_account else None,
+                "confidence": main_account.confidence if main_account else profile.match_confidence,
+                "last_updated": profile.updated_at.isoformat(),
+            })
+        return summary
 
     @staticmethod
     def _account_payload(item) -> dict[str, Any]:

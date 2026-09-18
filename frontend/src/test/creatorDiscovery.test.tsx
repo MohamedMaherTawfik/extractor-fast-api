@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { json, mockBackend, renderApp } from "./renderApp";
 
 const connector = (platform: string) => ({ platform, configured: false, name_discovery: "API_REQUIRED", direct_url: "SUPPORTED", profile_enumeration: "MANUAL_URL_REQUIRED", content_sampling: "API_REQUIRED", detail: "Direct public profile URLs are accepted." });
-const run = { run_uid: "CDRUN_1", status: "PARTIAL", input_count: 2, platforms: ["youtube", "instagram"], options: {}, processed: 2, matched: 1, review_required: 1, failed: 0, warnings: [], errors: [], created_at: new Date().toISOString(), jobs: [{ job_uid: "CDJOB_1", input_value: "Ahmed Example", normalized_input: "ahmed example", input_kind: "NAME", platforms: ["youtube", "instagram"], status: "PARTIAL", attempt: 1, checkpoint: {}, candidate_count: 1 }] };
+const run = { run_uid: "CDRUN_1", status: "PARTIAL", stage: "PARTIAL", progress_percent: 100, input_count: 2, platforms: ["youtube", "instagram"], options: {}, processed: 2, matched: 1, review_required: 1, failed: 0, warnings: [], errors: [], created_at: new Date().toISOString(), jobs: [{ job_uid: "CDJOB_1", input_value: "Ahmed Example", normalized_input: "ahmed example", input_kind: "NAME", platforms: ["youtube", "instagram"], status: "PARTIAL", stage: "PARTIAL", progress_percent: 100, attempt: 1, checkpoint: { current_creator: "Ahmed Example" }, candidate_count: 1 }] };
 const candidate = { candidate_uid: "CDC_1", platform: "youtube", display_name: "Ahmed Example", username: "ahmed", profile_url: "https://www.youtube.com/@ahmed", public_bio: "Educational technology reviews", followers: 800000, discovery_source: "youtube_data_api_v3", confidence: 96, classification: "CONFIRMED", review_status: "PENDING", profile_data: {}, provenance: [], retrieved_at: new Date().toISOString() };
 const creator = { profile_uid: "CDP_1", creator_uid: "CR_000001", name: "Ahmed Example", normalized_name: "ahmed example", niche: "Technology / Gadgets", industry: "Technology", main_platform: "youtube", main_platform_confidence: .95, platforms_found: ["youtube", "instagram"], youtube_url: "https://www.youtube.com/@ahmed", instagram_url: "https://www.instagram.com/ahmed", content_mechanism_style: "Reviews and comparisons", influence_size: "+800K", influence_size_numeric: 800000, kpi_impact: "Strong product-review influence", start_year: 2018, start_year_confidence: 1, match_confidence: 96, analysis_status: "COMPLETED", possible_duplicate: false, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
 const detail = { unified_profile: creator, platform_accounts: [{ platform: "youtube" }], content_samples: [{ title: "Phone review" }], analysis: [{ status: "COMPLETED" }], match_evidence: [{ signal: "normalized_name" }], provenance: [{ source: "youtube_data_api_v3" }], history: [{ action: "ANALYZED" }] };
@@ -16,6 +16,7 @@ function discoveryBackend() {
     if (url.includes("/creator-discovery/connectors")) return json(["youtube", "facebook", "instagram", "tiktok", "snapchat", "linkedin", "x"].map(connector));
     if (url.includes("/creator-discovery/industries")) return json([{ code: "technology", name: "Technology", aliases: [] }]);
     if (url.endsWith("/creator-discovery/runs") && init?.method === "POST") return json(run, 201);
+    if (url.includes("/creator-discovery/runs/CDRUN_1")) return json(run);
     if (url.includes("/creator-discovery/runs")) return json({ items: [run], total: 1, offset: 0, limit: 50 });
     if (url.includes("/creator-discovery/candidates/CDC_1/confirm")) return json(detail);
     if (url.includes("/creator-discovery/candidates")) return json({ items: [candidate], total: 1, offset: 0, limit: 50 });
@@ -29,11 +30,13 @@ describe("creator discovery studio", () => {
   it("starts a multiline multi-platform discovery", async () => {
     discoveryBackend(); renderApp("/creator-discovery"); const user = userEvent.setup();
     expect(await screen.findByRole("heading", { name: "Creator Discovery" })).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Bulk Discovery" }));
     await user.type(screen.getByLabelText("Creator Name(s)"), "Ahmed Example\nSara Example");
     await user.click(screen.getByRole("checkbox", { name: /TikTok/i }));
-    await user.click(screen.getByRole("button", { name: "START DISCOVERY" }));
+    await user.click(screen.getByRole("button", { name: "START BULK DISCOVERY" }));
     await waitFor(() => expect(fetch).toHaveBeenCalledWith(expect.stringContaining("/creator-discovery/runs"), expect.objectContaining({ method: "POST", body: expect.stringContaining("Ahmed Example") })));
-    expect((await screen.findAllByText("CDRUN_1")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(/CDRUN_1/)).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: /Creator Intelligence workbook/ })).toBeInTheDocument();
   }, 15_000);
 
   it("renders the candidate review and confirms an identity", async () => {

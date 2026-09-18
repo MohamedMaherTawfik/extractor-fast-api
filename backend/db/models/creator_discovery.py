@@ -48,6 +48,20 @@ class CreatorDiscoveryRun(Base):
         back_populates="run", cascade="all, delete-orphan"
     )
 
+    @property
+    def progress_percent(self) -> float:
+        if not self.jobs:
+            return 0.0
+        values = [float((job.checkpoint or {}).get("progress_percent") or 0) for job in self.jobs]
+        return round(sum(values) / len(values), 2)
+
+    @property
+    def stage(self) -> str:
+        active = next((job for job in self.jobs if job.status == "RUNNING"), None)
+        if active is not None:
+            return active.stage
+        return self.status
+
 
 class CreatorDiscoveryJob(Base):
     __tablename__ = "creator_discovery_jobs"
@@ -78,6 +92,14 @@ class CreatorDiscoveryJob(Base):
     candidates: Mapped[list["CreatorCandidate"]] = relationship(
         back_populates="job", cascade="all, delete-orphan"
     )
+
+    @property
+    def stage(self) -> str:
+        return str((self.checkpoint or {}).get("stage") or self.status)
+
+    @property
+    def progress_percent(self) -> float:
+        return float((self.checkpoint or {}).get("progress_percent") or 0)
 
 
 class CreatorCandidate(Base, TimestampMixin):
