@@ -2,7 +2,7 @@ export type Language = "ar" | "en";
 
 const messages = {
   ar: {
-    videoStudio: "استوديو الفيديو بالذكاء الاصطناعي", creatorDiscovery: "اكتشاف صناع المحتوى",
+    videoStudio: "استوديو الفيديو بالذكاء الاصطناعي", imageStudio: "استوديو صور المنتج", creatorDiscovery: "اكتشاف صناع المحتوى",
     home: "الرئيسية", leads: "اكتساب البيانات", content: "المحتوى", intelligence: "الذكاء", patterns: "الأنماط والوصفات", rules: "القواعد",
     generation: "التوليد", assets: "الأصول", calendar: "تقويم المحتوى", products: "المنتجات", customers: "العملاء",
     sales: "المبيعات", inventory: "المخزون", suppliers: "الموردون", msc: "استقبال MSC", conversations: "المحادثات",
@@ -10,7 +10,7 @@ const messages = {
     search: "ابحث في النظام…", online: "متصل", operator: "وضع المشغّل", empty: "لا توجد بيانات حتى الآن", retry: "إعادة المحاولة",
   },
   en: {
-    videoStudio: "AI Video Studio", creatorDiscovery: "Creator Discovery",
+    videoStudio: "AI Video Studio", imageStudio: "AI Product Image Studio", creatorDiscovery: "Creator Discovery",
     home: "Home", leads: "Data Acquisition", content: "Content", intelligence: "Intelligence", patterns: "Patterns & Recipes", rules: "Rules",
     generation: "Generation", assets: "Assets", calendar: "Content Calendar", products: "Products", customers: "Customers",
     sales: "Sales", inventory: "Inventory", suppliers: "Suppliers", msc: "MSC Intake", conversations: "Conversations",

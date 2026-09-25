@@ -16,6 +16,7 @@ const AnalyticsPage = lazy(() => import("./routes/AnalyticsPage"));
 const SettingsPage = lazy(() => import("./routes/SettingsPage"));
 const DataAcquisitionPage = lazy(() => import("./routes/DataAcquisitionPage"));
 const VideoStudioPage = lazy(() => import("./routes/VideoStudioPage"));
+const ImageStudioPage = lazy(() => import("./routes/ImageStudioPage"));
 const CreatorDiscoveryPage = lazy(() => import("./routes/CreatorDiscoveryPage"));
 
 const Guard = ({ children }: { children: React.ReactNode }) => <RouteErrorBoundary><Suspense fallback={<LoadingState />}>{children}</Suspense></RouteErrorBoundary>;
@@ -26,6 +27,7 @@ export default function App() {
     <Route path="patterns" element={<Guard><PatternRecipePage /></Guard>} /><Route path="rules" element={<Guard><RulesPage /></Guard>} />
     <Route path="generation" element={<Guard><GenerationPage /></Guard>} /><Route path="assets" element={<Guard><AssetsPage /></Guard>} />
     <Route path="video-studio" element={<Guard><VideoStudioPage /></Guard>} />
+    <Route path="image-studio" element={<Guard><ImageStudioPage /></Guard>} />
     <Route path="calendar" element={<Guard><CalendarPage /></Guard>} /><Route path="products" element={<Guard><ProductsPage /></Guard>} />
     <Route path="customers" element={<Guard><CustomersPage /></Guard>} /><Route path="sales" element={<Guard><SalesPage /></Guard>} />
     <Route path="inventory" element={<Guard><InventoryPage /></Guard>} /><Route path="suppliers" element={<Guard><SuppliersPage /></Guard>} />

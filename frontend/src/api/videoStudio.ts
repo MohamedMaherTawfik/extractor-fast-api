@@ -1,12 +1,12 @@
 import { api, apiUrl } from "./client";
 import { ApiError } from "../types/operator";
 
-export type VideoModel = { model_id: string; display_name: string; enabled: boolean; fps: number; max_duration_seconds: number; aspect_ratios: string[] };
+export type VideoModel = { model_id: string; display_name: string; enabled: boolean; verified?: boolean; available?: boolean; fps: number; max_duration_seconds: number; aspect_ratios: string[] };
 export type VideoRecipe = { recipe_id: string; name: string; camera_style: string; lighting: string; colors: string; environment: string; realism_level: string; motion_style: string };
-export type StudioConfig = { version: string; provider: string; comfyui_configured: boolean; default_model: string; models: VideoModel[]; recipes: VideoRecipe[]; worker: { concurrency: number; active_jobs: string[] } };
+export type StudioConfig = { version: string; provider: string; comfyui_configured: boolean; comfyui?: string; generation_available?: boolean; default_model: string; models: VideoModel[]; configured_models?: VideoModel[]; missing_requirements?: { code: string; message: string }[]; recipes: VideoRecipe[]; worker: { concurrency: number; active_jobs: string[] } };
 export type Character = { character_id: string; name: string; version: number; reference_image: string; identity_data: Record<string, unknown>; style_profile: Record<string, unknown>; recurring_attributes: string[]; negative_constraints: string[]; updated_at: string };
 export type VideoAsset = { asset_id: string; version: number; preview_url: string; saved: boolean; filename: string; created_at: string; metadata: Record<string, unknown> };
-export type VideoJob = { job_id: string; batch_id?: string; status: string; progress: number; stage: string; request: Record<string, unknown>; prompt_package?: Record<string, unknown>; model?: { model_id: string; display_name: string }; final_video?: VideoAsset; error?: string; created_at: string };
+export type VideoJob = { job_id: string; batch_id?: string; status: string; progress: number; stage: string; request: Record<string, unknown>; prompt_package?: Record<string, unknown>; model?: { model_id: string; display_name: string }; final_video?: VideoAsset; error?: { code: string; message: string; stage?: string; http_status?: number; node_errors?: unknown }; created_at: string };
 
 async function uploadCharacter(form: FormData): Promise<Character> {
   const requestId = crypto.randomUUID();
