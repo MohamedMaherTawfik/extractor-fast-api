@@ -2,17 +2,23 @@ version: 1.0.0
 default_model: wan_video
 worker_concurrency: 1
 poll_interval_seconds: 1.0
+upload_timeout_seconds: 300
 generation_timeout_seconds: 3600
 max_reference_size_bytes: 26214400
+max_reference_dimension: 12000
+accepted_output_extensions: [".mp4", ".webm", ".mov", ".gif"]
 
-# Workflow files must be ComfyUI API-format JSON. The included files are
-# injection templates; export the matching production graph from ComfyUI and
-# retain these node IDs/inputs, or update the mappings below.
+# The included workflow JSON files are UNVERIFIED/TEMPLATE examples only. They
+# are intentionally disabled and cannot make Video Studio generation-ready.
+# Replace a template with a real API-format export, set exact model_files and
+# required_custom_nodes, then set enabled and verified only after /object_info
+# preflight succeeds on the target ComfyUI runtime.
 models:
   - model_id: wan_video
     display_name: Wan Video
     workflow_file: wan_video.json
-    enabled: true
+    enabled: false
+    verified: false
     fps: 16
     max_duration_seconds: 20
     aspect_ratios: ["1:1", "4:5", "9:16", "16:9"]
@@ -30,7 +36,8 @@ models:
   - model_id: hunyuan_video
     display_name: Hunyuan Video
     workflow_file: hunyuan_video.json
-    enabled: true
+    enabled: false
+    verified: false
     fps: 16
     max_duration_seconds: 20
     aspect_ratios: ["1:1", "4:5", "9:16", "16:9"]
@@ -48,7 +55,8 @@ models:
   - model_id: animatediff
     display_name: AnimateDiff
     workflow_file: animatediff.json
-    enabled: true
+    enabled: false
+    verified: false
     fps: 16
     max_duration_seconds: 16
     aspect_ratios: ["1:1", "4:5", "9:16", "16:9"]
@@ -66,7 +74,8 @@ models:
   - model_id: stable_video_diffusion
     display_name: Stable Video Diffusion
     workflow_file: stable_video_diffusion.json
-    enabled: true
+    enabled: false
+    verified: false
     fps: 8
     max_duration_seconds: 8
     aspect_ratios: ["9:16", "16:9"]

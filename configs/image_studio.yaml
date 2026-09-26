@@ -1,0 +1,15 @@
+# This configuration intentionally contains no image model or workflow until
+# one has been validated against the local ComfyUI installation. Add only
+# exact paths, node IDs, inputs, and model files discovered on that machine.
+version: 1.0.0
+worker_concurrency: 1
+upload_timeout_seconds: 300
+generation_timeout_seconds: 3600
+poll_interval_seconds: 1.0
+max_reference_size_bytes: 26214400
+max_image_dimension: 12000
+comfyui_install_path: null
+custom_nodes_path: null
+models_path: null
+workflows_path: comfyui_image_workflows
+models: []

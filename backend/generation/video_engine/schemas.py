@@ -90,7 +90,7 @@ class VideoJob(BaseModel):
     model: dict[str, Any] | None = None
     comfyui_prompt_id: str | None = None
     final_video: dict[str, Any] | None = None
-    error: str | None = None
+    error: dict[str, Any] | None = None
     created_at: datetime
     updated_at: datetime
     started_at: datetime | None = None

@@ -23,10 +23,16 @@ class VideoModelConfig(BaseModel):
     display_name: str
     workflow_file: str
     enabled: bool = True
+    # A template is deliberately not a runnable model.  Only an operator who
+    # has validated an exported API workflow on the target ComfyUI runtime may
+    # set this to true.
+    verified: bool = False
     fps: int = Field(default=16, ge=1, le=120)
     max_duration_seconds: float = Field(default=20, ge=1, le=120)
     aspect_ratios: list[str] = Field(default_factory=lambda: ["9:16", "16:9"])
     supports_image_reference: bool = True
+    model_files: list[str] = Field(default_factory=list)
+    required_custom_nodes: list[str] = Field(default_factory=list)
     injections: dict[str, InjectionTarget] = Field(default_factory=dict)
     output_node_ids: list[str] = Field(default_factory=list)
 
@@ -49,10 +55,13 @@ class VideoEngineConfig(BaseModel):
     default_model: str
     worker_concurrency: int = Field(default=1, ge=1, le=4)
     poll_interval_seconds: float = Field(default=1.0, ge=0.1, le=30)
+    upload_timeout_seconds: int = Field(default=300, ge=30, le=3600)
     generation_timeout_seconds: int = Field(default=3600, ge=30, le=86400)
     max_reference_size_bytes: int = Field(default=25 * 1024 * 1024, ge=1024)
+    max_reference_dimension: int = Field(default=12000, ge=128, le=50000)
     models: list[VideoModelConfig]
     recipes: list[PromptRecipeConfig]
+    accepted_output_extensions: list[str] = Field(default_factory=lambda: [".mp4", ".webm", ".mov", ".gif"])
 
     @model_validator(mode="after")
     def references_are_valid(self):
@@ -64,6 +73,8 @@ class VideoEngineConfig(BaseModel):
         recipe_ids = {item.recipe_id for item in self.recipes}
         if len(recipe_ids) != len(self.recipes):
             raise ValueError("Prompt recipe IDs must be unique")
+        if not self.accepted_output_extensions or any(not value.startswith(".") for value in self.accepted_output_extensions):
+            raise ValueError("accepted_output_extensions must contain file extensions beginning with '.'")
         return self
 
     def model(self, model_id: str) -> VideoModelConfig:

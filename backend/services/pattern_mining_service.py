@@ -1,5 +1,7 @@
 """Deterministic multi-level pattern mining over comparable Content DNA cohorts."""
 
+from __future__ import annotations
+
 import hashlib
 import json
 from collections import defaultdict

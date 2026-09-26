@@ -9,7 +9,7 @@ from typing import Callable
 
 class GPUWorker:
     def __init__(self, concurrency: int = 1) -> None:
-        self._executor = ThreadPoolExecutor(max_workers=concurrency, thread_name_prefix="emy-video-gpu")
+        self._executor = ThreadPoolExecutor(max_workers=concurrency, thread_name_prefix="emy-generation-gpu")
         self._futures: dict[str, Future[None]] = {}
         self._cancelled: set[str] = set()
         self._lock = RLock()

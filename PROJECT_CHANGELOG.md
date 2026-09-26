@@ -267,3 +267,13 @@
 - Added small local fixtures and tests for every content route, segments/shots/events, rule filtering, normalized schemas, confidence/evidence, UNKNOWN and NOT_APPLICABLE, cache/versioning, provider failure isolation, batch jobs, API, and persistence.
 - Passed all 48 tests and verified compileall, Alembic metadata agreement, migration upgrade/downgrade, and dependency health.
 - Confirmed no Pattern/Recipe Engine, winner detection, generation, sales, publishing, frontend, or external AI provider was started.
+
+## 2026-09-25 — Image/Video generation application readiness hardening
+
+- Fixed backend import-time annotation shadowing that blocked generation test startup.
+- Hardened Image Studio job lifecycle with cancellation, restart recovery, connector cleanup, and persisted execution intent.
+- Made live ComfyUI `/object_info` authoritative for required image custom class types.
+- Strengthened image/video workflow checks for exact configured model references and output-node suitability.
+- Hardened video character references with content/MIME/extension/dimension validation.
+- Kept bundled video workflows disabled/unverified and image runtime registry empty until real ComfyUI models, nodes, and API-format workflows are supplied.
+- Focused generation regression: 42 tests passed; backend compile/import verification passed.

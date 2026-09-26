@@ -8,13 +8,13 @@ from threading import RLock
 from typing import Callable
 
 from backend.core.config import get_settings
-from backend.core.exceptions import GenerationError
+from backend.core.exceptions import ConfigurationError, GenerationError, ModelCapabilityError, ProviderUnavailableError
 from backend.generation.video_engine.asset_manager import VideoAssetManager
 from backend.generation.video_engine.character_memory import CharacterMemory
-from backend.generation.video_engine.comfyui_connector import ComfyUIConnector
+from backend.generation.video_engine.comfyui_connector import ComfyUIConnector, ComfyUIResponseError
 from backend.generation.video_engine.config import VideoEngineConfig, load_video_config
 from backend.generation.video_engine.gpu_worker import GPUWorker
-from backend.generation.video_engine.model_router import ModelRouter
+from backend.generation.video_engine.model_router import ModelRouter, VideoStudioCapabilities
 from backend.generation.video_engine.prompt_pipeline import PromptPipeline
 from backend.generation.video_engine.schemas import (
     BatchGenerationRequest, BatchRecord, VideoGenerationRequest, VideoJob,
@@ -33,9 +33,14 @@ class VideoGenerator:
         workflows: WorkflowManager | None = None,
         worker: GPUWorker | None = None,
         connector_factory: ConnectorFactory | None = None,
+        capability_connector_factory: ConnectorFactory | None = None,
+        capabilities: VideoStudioCapabilities | None = None,
     ) -> None:
         self.config = config or load_video_config()
-        self.characters = characters or CharacterMemory(max_size_bytes=self.config.max_reference_size_bytes)
+        self.characters = characters or CharacterMemory(
+            max_size_bytes=self.config.max_reference_size_bytes,
+            max_dimension=self.config.max_reference_dimension,
+        )
         self.assets = assets or VideoAssetManager()
         self.workflows = workflows or WorkflowManager()
         self.router = ModelRouter(self.config)
@@ -45,12 +50,18 @@ class VideoGenerator:
         self.connector_factory = connector_factory or (lambda: ComfyUIConnector(
             settings.comfyui_base_url, poll_interval_seconds=self.config.poll_interval_seconds,
             timeout_seconds=self.config.generation_timeout_seconds,
+            request_timeout_seconds=self.config.upload_timeout_seconds,
         ))
+        self.capabilities = capabilities or VideoStudioCapabilities(
+            self.config,
+            self.workflows,
+            capability_connector_factory or (lambda: ComfyUIConnector(settings.comfyui_base_url, request_timeout_seconds=5.0)),
+        )
         self._lock = RLock()
 
     def create(self, request: VideoGenerationRequest, *, batch_id: str | None = None) -> VideoJob:
         character = self.characters.get(request.character_id)
-        model = self.router.select(request)
+        model = self.capabilities.select(request)
         prompt = self.prompts.build(request, character)
         job = self.assets.create_job(request, batch_id=batch_id)
         job.prompt_package = prompt.model_dump(mode="json")
@@ -67,33 +78,36 @@ class VideoGenerator:
         job = self.assets.get_job(job_id)
         if job.status == "COMPLETED":
             return
+        connector: ComfyUIConnector | None = None
         try:
             request = VideoGenerationRequest.model_validate(job.request)
             character = self.characters.get(request.character_id)
-            model = self.router.select(request)
+            if self.worker.is_cancelled(job_id):
+                raise ComfyUIResponseError("Generation was cancelled", stage="generation", code="GENERATION_CANCELLED")
+            model = self.capabilities.select(request)
             prompt = self.prompts.build(request, character)
             connector = self.connector_factory()
-            job.status = "RUNNING"
             job.started_at = job.started_at or datetime.now(UTC)
-            self._progress(job, 5, "Preparing character identity")
+            self._progress(job, 5, "UPLOADING: preparing character identity", status="UPLOADING")
             uploaded = connector.upload_reference(self.characters.reference_path(character))
-            self._progress(job, 20, "Character reference uploaded")
+            self._progress(job, 20, "BUILDING_WORKFLOW: character reference uploaded", status="BUILDING_WORKFLOW")
             workflow = self.workflows.inject(
-                self.workflows.load(model), model=model, request=request,
+                self.workflows.load_and_validate(model), model=model, request=request,
                 prompt=prompt, uploaded_reference=uploaded,
             )
-            self._progress(job, 28, "Workflow prompt and reference injected")
+            self._progress(job, 28, "SUBMITTED: workflow prompt and reference injected", status="SUBMITTED")
             prompt_id = connector.queue_workflow(workflow)
             job.comfyui_prompt_id = prompt_id
-            self._progress(job, 32, "Queued in ComfyUI")
+            self._progress(job, 32, "GENERATING: queued in ComfyUI", status="GENERATING")
             outputs = connector.wait_for_outputs(
                 prompt_id, output_node_ids=model.output_node_ids,
-                progress=lambda value, stage: self._progress(job, value, stage),
+                accepted_extensions=set(self.config.accepted_output_extensions),
+                progress=lambda value, stage: self._progress(job, value, f"GENERATING: {stage}", status="GENERATING"),
                 cancelled=lambda: self.worker.is_cancelled(job_id),
             )
             output = outputs[0]
             content = connector.download_output(output)
-            self._progress(job, 95, "Saving versioned EMY asset")
+            self._progress(job, 95, "PROCESSING: saving versioned EMY asset", status="PROCESSING")
             asset = self.assets.save_video(
                 job=job, content=content, source_filename=output.filename,
                 metadata={
@@ -112,15 +126,20 @@ class VideoGenerator:
             job.completed_at = datetime.now(UTC)
             self.assets.save_job(job)
         except Exception as exc:
-            job.status = "CANCELLED" if self.worker.is_cancelled(job_id) else "FAILED"
+            cancelled = self.worker.is_cancelled(job_id) or getattr(exc, "code", None) == "GENERATION_CANCELLED"
+            job.status = "CANCELLED" if cancelled else ("PARTIAL" if job.final_video else "FAILED")
             job.stage = "Cancelled" if job.status == "CANCELLED" else "Generation failed"
-            job.error = self._safe_error(exc)
+            job.error = self._error_details(exc, job)
             job.completed_at = datetime.now(UTC)
             self.assets.save_job(job)
+        finally:
+            close = getattr(connector, "close", None)
+            if callable(close):
+                close()
 
     def retry(self, job_id: str) -> VideoJob:
         job = self.assets.get_job(job_id)
-        if job.status not in {"FAILED", "CANCELLED"}:
+        if job.status not in {"FAILED", "CANCELLED", "PARTIAL"}:
             raise GenerationError("Only failed or cancelled video jobs can be retried")
         job.status, job.progress, job.stage, job.error = "QUEUED", 0, "Queued for retry", None
         self.assets.save_job(job)
@@ -165,7 +184,7 @@ class VideoGenerator:
             status = "COMPLETED"
         elif statuses <= {"FAILED", "CANCELLED"}:
             status = "FAILED"
-        elif statuses & {"RUNNING", "COMPLETED", "FAILED", "CANCELLED"}:
+        elif statuses & {"UPLOADING", "BUILDING_WORKFLOW", "SUBMITTED", "GENERATING", "PROCESSING", "COMPLETED", "FAILED", "CANCELLED", "PARTIAL"}:
             status = "RUNNING"
         else:
             status = "QUEUED"
@@ -180,25 +199,42 @@ class VideoGenerator:
     def recover_pending(self) -> int:
         recovered = 0
         for job in self.assets.list_jobs(limit=1000):
-            if job.status not in {"QUEUED", "RUNNING"} or not job.request.get("execute", True):
+            if job.status not in {"QUEUED", "UPLOADING", "BUILDING_WORKFLOW", "SUBMITTED", "GENERATING", "PROCESSING"} or not job.request.get("execute", True):
                 continue
-            if job.status == "RUNNING":
+            if job.status != "QUEUED":
                 job.status, job.stage = "QUEUED", "Recovered after backend restart"
                 self.assets.save_job(job)
             self.worker.submit(job.job_id, lambda job_id=job.job_id: self.run(job_id))
             recovered += 1
         return recovered
 
-    def _progress(self, job: VideoJob, value: int, stage: str) -> None:
+    def _progress(self, job: VideoJob, value: int, stage: str, *, status: str | None = None) -> None:
         with self._lock:
             current = self.assets.get_job(job.job_id)
             if current.status == "CANCELLED":
                 return
+            if status:
+                job.status = status
             job.progress = max(job.progress, min(value, 99))
             job.stage = stage
             self.assets.save_job(job)
 
     @staticmethod
-    def _safe_error(exc: Exception) -> str:
-        message = str(exc).replace("\r", " ").replace("\n", " ").strip()
-        return (message or exc.__class__.__name__)[:2000]
+    def _error_details(exc: Exception, job: VideoJob) -> dict[str, object]:
+        if isinstance(exc, ComfyUIResponseError):
+            details: dict[str, object] = exc.details()
+        elif isinstance(exc, ModelCapabilityError):
+            message = str(exc)
+            details = {"code": message.split(":", 1)[0] or "NO_LOCAL_VIDEO_MODEL", "message": message}
+        elif isinstance(exc, ConfigurationError):
+            details = {"code": "INVALID_WORKFLOW", "message": str(exc)}
+        elif isinstance(exc, ProviderUnavailableError):
+            details = {"code": "COMFYUI_API_UNAVAILABLE", "message": str(exc)}
+        elif isinstance(exc, GenerationError):
+            details = {"code": getattr(exc, "code", "GENERATION_FAILED"), "message": str(exc)}
+        else:
+            details = {"code": "GENERATION_FAILED", "message": str(exc)}
+        details["job_id"] = job.job_id
+        if job.comfyui_prompt_id:
+            details["prompt_id"] = job.comfyui_prompt_id
+        return details

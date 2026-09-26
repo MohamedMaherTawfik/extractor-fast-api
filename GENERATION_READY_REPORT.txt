@@ -1,0 +1,37 @@
+EMY IMAGE + VIDEO GENERATION READINESS
+Date: 2026-09-25
+
+STATUS
+APPLICATION_READY / COMFYUI_RUNTIME_NOT_CONFIGURED
+
+VERIFIED
+- Focused Image Studio + Video Studio + ComfyUI Connector + shared Generation tests: 42 passed.
+- Backend Python compile verification: passed.
+- Backend application import: passed (BACKEND_IMPORT_OK).
+- Original project database/data restored after testing; test cleanup was not left in the deliverable.
+
+CODE HARDENING COMPLETED
+- Fixed import-time list annotation shadowing that blocked backend/generation test startup.
+- Image Studio: cancellation, restart recovery, persisted execute intent, connector cleanup, cancellation-safe progress/error state.
+- Image Studio: live /object_info class_type checks are authoritative for required custom nodes.
+- Image workflow validation: placeholders, exact configured model references, nodes/inputs/links/types/model choices/output suitability.
+- Video reference uploads: real image-content/MIME/extension/dimension validation.
+- Video workflow validation: exact model selection/reference checks and output-node suitability.
+- Shared ComfyUI connector: local requests ignore environment proxies; detailed response bodies/node errors remain preserved.
+- Video runtime config now explicitly exposes upload timeout, reference dimension limit, and accepted output extensions.
+
+REMAINING EXTERNAL COMFYUI WORK ONLY
+IMAGE
+1. Real image model(s)
+2. Exact required custom nodes/class_types
+3. Real validated ComfyUI API-format image workflow + exact injection/output mapping
+
+VIDEO
+1. Real video model(s)
+2. Exact required custom nodes/class_types
+3. Real validated ComfyUI API-format video workflow + exact injection/output mapping
+
+KNOWN UNRELATED EXISTING TEST FAILURE
+- tests/test_lead_acquisition.py::test_dedupe_domain_signal_merges_and_keeps_source_provenance
+- Cause: configured lead taxonomy does not currently contain segment `cosmetics_suppliers`.
+- This is unrelated to Image Studio / Video Studio and was intentionally not modified.

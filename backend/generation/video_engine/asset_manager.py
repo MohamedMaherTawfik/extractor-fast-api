@@ -98,6 +98,8 @@ class VideoAssetManager:
             raise InvalidGeneratedAssetError(f"Unsupported ComfyUI video output: {suffix or 'no extension'}")
         if not content:
             raise InvalidGeneratedAssetError("ComfyUI returned an empty video")
+        if not _valid_video_content(content, suffix):
+            raise InvalidGeneratedAssetError("ComfyUI output content does not match its declared video extension")
         asset_id = str((job.final_video or {}).get("asset_id") or f"VAST_{uuid4().hex}")
         directory = self.assets_root / paths.safe_component(asset_id)
         directory.mkdir(parents=True, exist_ok=True)
@@ -164,3 +166,13 @@ class VideoAssetManager:
         temporary = target.with_suffix(target.suffix + ".tmp")
         temporary.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
         temporary.replace(target)
+
+
+def _valid_video_content(content: bytes, suffix: str) -> bool:
+    if suffix in {".mp4", ".mov"}:
+        return len(content) >= 12 and content[4:8] == b"ftyp"
+    if suffix == ".webm":
+        return content.startswith(b"\x1a\x45\xdf\xa3")
+    if suffix == ".gif":
+        return content.startswith((b"GIF87a", b"GIF89a"))
+    return False

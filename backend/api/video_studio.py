@@ -47,12 +47,18 @@ def _json_list(value: str, field: str) -> list[str]:
 @router.get("/config")
 def studio_config():
     engine = get_video_generator()
+    capabilities = engine.capabilities.report()
     return {
         "version": engine.config.version,
         "provider": "comfyui",
         "comfyui_configured": bool(get_settings().comfyui_base_url),
+        "comfyui": capabilities["comfyui"],
+        "generation_available": capabilities["generation_available"],
         "default_model": engine.config.default_model,
-        "models": engine.router.public_models(),
+        "models": capabilities["models"],
+        "configured_models": engine.router.public_models(),
+        "model_checks": capabilities["model_checks"],
+        "missing_requirements": capabilities["missing_requirements"],
         "recipes": [
             {
                 "recipe_id": item.recipe_id, "name": item.name,
@@ -64,6 +70,12 @@ def studio_config():
         ],
         "worker": {"concurrency": engine.config.worker_concurrency, "active_jobs": engine.worker.active_jobs()},
     }
+
+
+@router.get("/capabilities")
+@router.get("/health")
+def studio_capabilities():
+    return get_video_generator().capabilities.report()
 
 
 @router.post("/characters", status_code=status.HTTP_201_CREATED)
@@ -78,7 +90,7 @@ async def create_character(
     engine = get_video_generator()
     content = await file.read(engine.config.max_reference_size_bytes + 1)
     return engine.characters.create(
-        name=name, image=content, mime_type=file.content_type or "application/octet-stream",
+        name=name, image=content, mime_type=file.content_type or "application/octet-stream", filename=file.filename,
         identity_data=_json_object(identity_data, "identity_data"),
         style_profile=_json_object(style_profile, "style_profile"),
         recurring_attributes=_json_list(recurring_attributes, "recurring_attributes"),

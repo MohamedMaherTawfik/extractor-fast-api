@@ -1,5 +1,7 @@
 """Build editable generation plans from supported patterns without generating media."""
 
+from __future__ import annotations
+
 from collections import Counter
 from statistics import mean, median
 from uuid import uuid4

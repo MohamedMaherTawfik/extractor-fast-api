@@ -15,8 +15,9 @@ machine and contains no development-device hardware probing.
    camera motion, style, duration, and output ratio.
 3. Character identity fields and the reference checksum become immutable job
    metadata and explicit positive/negative prompt constraints.
-4. The model router selects an enabled workflow for Wan Video, Hunyuan Video,
-   AnimateDiff, or Stable Video Diffusion.
+4. Capability preflight selects only an enabled, verified workflow that passes
+   the running ComfyUI `/object_info` contract. The shipped Wan Video, Hunyuan
+   Video, AnimateDiff, and Stable Video Diffusion files are unverified templates.
 5. EMY uploads the reference to ComfyUI, injects prompt/image/dimensions/frame
    count/FPS/seed, submits `/prompt`, tracks `/queue` and `/history`, and fetches
    the final media through `/view`.
@@ -44,9 +45,11 @@ developer workstation.
    **AI Video Studio** in the desktop sidebar.
 
 The included JSON files are API injection templates, not a promise that a
-particular third-party custom-node pack uses the same class names. Production
-deployments replace them with graphs exported from the installed GPU runtime;
-no Python code change is needed.
+particular third-party custom-node pack uses the same class names. They are
+disabled and cannot be reported as ready. Production deployments replace them
+with graphs exported from the installed GPU runtime and set exact model files,
+class types, node IDs, inputs, plus `verified: true`; no Python code change is
+needed.
 
 ## Configuration
 

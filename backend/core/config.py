@@ -88,6 +88,11 @@ class Settings(BaseSettings):
     run_live_generation_tests: bool = False
     video_generation_config_file: str = "video_generation.yaml"
     video_generation_engine_version: str = "1.0.0"
+    image_studio_config_file: str = "image_studio.yaml"
+    image_studio_engine_version: str = "1.0.0"
+    image_studio_comfyui_install_path: str | None = None
+    image_studio_custom_nodes_path: str | None = None
+    image_studio_models_path: str | None = None
     comfyui_base_url: str = "http://127.0.0.1:8188"
     sales_engine_version: str = "1.0.0"
     sales_config_file: str = "sales.yaml"

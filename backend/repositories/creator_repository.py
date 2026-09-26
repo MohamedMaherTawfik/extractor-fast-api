@@ -1,5 +1,7 @@
 """Persistence operations for Creator Master."""
 
+from __future__ import annotations
+
 from uuid import uuid4
 
 from sqlalchemy import String, cast, func, or_, select, update
