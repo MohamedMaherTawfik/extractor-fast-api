@@ -9,9 +9,10 @@ from backend.core.exceptions import ConfigurationError, ModelCapabilityError, Re
 from backend.core.paths import paths
 from backend.generation.video_engine.comfyui_connector import ComfyOutput
 from backend.generation.video_engine.gpu_worker import GPUWorker
+from backend.image_studio.capabilities import ImageStudioCapabilities
 from backend.image_studio.config import load_image_studio_config
 from backend.image_studio.prompting import PRESETS, apply_preset, build_prompt
-from backend.image_studio.schemas import CameraAngle, ImageModelConfig, ImageStudioConfig, ImageStudioSettings, InjectionTarget, options_catalog
+from backend.image_studio.schemas import CameraAngle, ImageDimensions, ImageModelConfig, ImageStudioConfig, ImageStudioSettings, InjectionTarget, ModelFileRequirement, options_catalog
 from backend.image_studio.service import ImageStudioService
 from backend.image_studio.storage import ImageStudioStorage
 from backend.image_studio.workflow import ImageWorkflowManager
@@ -87,17 +88,22 @@ def image_runtime():
         "2": {"class_type": "PromptNode", "inputs": {"text": ""}},
         "3": {"class_type": "ImageNode", "inputs": {"image": ""}},
         "4": {"class_type": "ImageNode", "inputs": {"image": ""}},
+        "5": {"class_type": "SamplerNode", "inputs": {"seed": 0, "width": 1024, "height": 1024}},
         "9": {"class_type": "OutputNode", "inputs": {"images": ["4", 0]}},
     }
     (root / "workflow.json").write_text(json.dumps(workflow), encoding="utf-8")
     model = ImageModelConfig(
         model_id="verified_test_model", display_name="Verified test model", workflow_file="workflow.json",
-        model_files=["checkpoint.safetensors"], output_node_ids=["9"],
+        model_files=[ModelFileRequirement(path="checkpoints/checkpoint.safetensors", workflow_value="checkpoint.safetensors")],
+        dimensions={"4:5": ImageDimensions(width=512, height=640)}, output_node_ids=["9"],
         injections={
             "positive_prompt": InjectionTarget(node_id="1", input="text"),
             "negative_prompt": InjectionTarget(node_id="2", input="text"),
             "character_reference": InjectionTarget(node_id="3", input="image"),
             "product_reference": InjectionTarget(node_id="4", input="image"),
+            "width": InjectionTarget(node_id="5", input="width"),
+            "height": InjectionTarget(node_id="5", input="height"),
+            "seed": InjectionTarget(node_id="5", input="seed"),
         },
     )
     config = ImageStudioConfig(models=[model])
@@ -137,6 +143,17 @@ def test_every_image_studio_preset_matches_the_public_settings_schema():
     assert "Close-Up Angle" in options_catalog()["camera_angle"]
 
 
+def test_default_config_loads_the_sd15_gtx1070_dimension_profile():
+    load_image_studio_config.cache_clear()
+    config = load_image_studio_config()
+    profile = config.dimension_profiles["sd15_gtx1070"]
+    assert (profile["1:1"].width, profile["1:1"].height) == (512, 512)
+    assert (profile["4:5"].width, profile["4:5"].height) == (512, 640)
+    assert (profile["3:4"].width, profile["3:4"].height) == (576, 768)
+    assert (profile["9:16"].width, profile["9:16"].height) == (432, 768)
+    assert (profile["16:9"].width, profile["16:9"].height) == (768, 432)
+
+
 def test_reference_upload_validates_real_content_extension_mime_and_dimensions(tmp_path):
     storage = ImageStudioStorage(tmp_path / "state", tmp_path / "assets", tmp_path / "references")
     assert storage.inspect_upload(filename="character.png", content_type="image/png", content=png(), max_size=10000, max_dimension=1000)[:2] == ("image/png", ".png")
@@ -147,7 +164,7 @@ def test_reference_upload_validates_real_content_extension_mime_and_dimensions(t
 
 
 def test_workflow_validation_rejects_missing_required_input(tmp_path):
-    model = ImageModelConfig(model_id="test", display_name="Test", workflow_file="broken.json", model_files=["model"], output_node_ids=["9"], injections={
+    model = ImageModelConfig(model_id="test", display_name="Test", workflow_file="broken.json", model_files=[ModelFileRequirement(path="checkpoints/model", workflow_value="model")], output_node_ids=["9"], injections={
         "positive_prompt": InjectionTarget(node_id="1", input="text"), "negative_prompt": InjectionTarget(node_id="1", input="negative"),
         "character_reference": InjectionTarget(node_id="1", input="character"), "product_reference": InjectionTarget(node_id="1", input="product"),
     })
@@ -157,7 +174,7 @@ def test_workflow_validation_rejects_missing_required_input(tmp_path):
 
 
 def test_workflow_validation_uses_live_node_metadata_for_class_links_and_models(tmp_path):
-    model = ImageModelConfig(model_id="test", display_name="Test", workflow_file="invalid.json", model_files=["model"], output_node_ids=["2"], injections={
+    model = ImageModelConfig(model_id="test", display_name="Test", workflow_file="invalid.json", model_files=[ModelFileRequirement(path="checkpoints/model", workflow_value="model")], output_node_ids=["2"], injections={
         "positive_prompt": InjectionTarget(node_id="1", input="text"), "negative_prompt": InjectionTarget(node_id="1", input="negative"),
         "character_reference": InjectionTarget(node_id="1", input="character"), "product_reference": InjectionTarget(node_id="1", input="product"),
     })
@@ -186,8 +203,185 @@ def test_successful_job_stores_prompt_references_outputs_and_regeneration(image_
     complete = engine.storage.get_job(job.job_id)
     assert complete.status == "COMPLETED" and len(complete.output_images) == 2
     assert "preserve identity" in complete.prompt and fake.workflows[0]["3"]["inputs"]["image"].startswith("character_")
+    assert complete.seed == 13
+    assert [workflow["5"]["inputs"]["seed"] for workflow in fake.workflows] == [13, 14]
     retry = engine.regenerate(job.job_id, same_seed=True)
     assert retry.seed == 13 and retry.status == "QUEUED"
+
+
+def test_seedless_generation_persists_random_base_seed_and_uses_sequential_seeds(image_runtime):
+    engine, fake = image_runtime
+    job = engine.create(
+        character_filename="character.png", character_mime="image/png", character_content=png(),
+        product_filename="product.png", product_mime="image/png", product_content=png(),
+        settings=ImageStudioSettings(model_id="verified_test_model", number_of_images=4), execute=False,
+    )
+
+    engine.run(job.job_id)
+
+    complete = engine.storage.get_job(job.job_id)
+    assert complete.seed is not None
+    assert 0 <= complete.seed <= 2_147_483_647
+    assert complete.settings["seed"] == complete.seed
+    assert [workflow["5"]["inputs"]["seed"] for workflow in fake.workflows] == [
+        complete.seed,
+        complete.seed + 1,
+        complete.seed + 2,
+        complete.seed + 3,
+    ]
+
+
+def test_same_seed_regeneration_reuses_persisted_random_base_seed(image_runtime):
+    engine, _ = image_runtime
+    source = engine.create(
+        character_filename="character.png", character_mime="image/png", character_content=png(),
+        product_filename="product.png", product_mime="image/png", product_content=png(),
+        settings=ImageStudioSettings(model_id="verified_test_model"), execute=False,
+    )
+    engine.run(source.job_id)
+    persisted = engine.storage.get_job(source.job_id).seed
+
+    retry = engine.regenerate(source.job_id, same_seed=True)
+
+    assert persisted is not None
+    assert retry.seed == persisted
+    assert retry.settings["seed"] == persisted
+
+
+def test_model_specific_sd15_dimensions_are_injected_and_unconfigured_ratios_fail(tmp_path):
+    workflow = {
+        "0": {"class_type": "ModelNode", "inputs": {"model_name": "checkpoint.safetensors"}},
+        "1": {"class_type": "Inputs", "inputs": {"text": "", "negative": "", "character": "", "product": "", "width": 0, "height": 0}},
+        "9": {"class_type": "Output", "inputs": {"images": ["1", 0]}},
+    }
+    (tmp_path / "workflow.json").write_text(json.dumps(workflow), encoding="utf-8")
+    model = ImageModelConfig(
+        model_id="sd15", display_name="SD1.5", workflow_file="workflow.json",
+        model_files=[ModelFileRequirement(path="checkpoints/checkpoint.safetensors", workflow_value="checkpoint.safetensors")],
+        dimension_profile="sd15_gtx1070", output_node_ids=["9"],
+        injections={
+            "positive_prompt": InjectionTarget(node_id="1", input="text"),
+            "negative_prompt": InjectionTarget(node_id="1", input="negative"),
+            "character_reference": InjectionTarget(node_id="1", input="character"),
+            "product_reference": InjectionTarget(node_id="1", input="product"),
+            "width": InjectionTarget(node_id="1", input="width"),
+            "height": InjectionTarget(node_id="1", input="height"),
+        },
+    )
+    config = ImageStudioConfig(
+        dimension_profiles={
+            "sd15_gtx1070": {
+                "1:1": ImageDimensions(width=512, height=512),
+                "4:5": ImageDimensions(width=512, height=640),
+                "3:4": ImageDimensions(width=576, height=768),
+                "9:16": ImageDimensions(width=432, height=768),
+                "16:9": ImageDimensions(width=768, height=432),
+            }
+        },
+        models=[model],
+    )
+    manager = ImageWorkflowManager(tmp_path)
+    compiled = manager.inject(
+        workflow, model=config.models[0], settings=ImageStudioSettings(aspect_ratio="9:16"),
+        prompt="positive", negative_prompt="negative", character_reference="character.png",
+        product_reference="product.png", seed=10,
+    )
+    assert compiled["1"]["inputs"]["width"] == 432
+    assert compiled["1"]["inputs"]["height"] == 768
+    with pytest.raises(ConfigurationError, match="not configured"):
+        manager.inject(
+            workflow, model=config.models[0], settings=ImageStudioSettings(aspect_ratio="Custom"),
+            prompt="positive", negative_prompt="negative", character_reference="character.png",
+            product_reference="product.png", seed=10,
+        )
+
+
+def test_model_file_path_and_workflow_loader_value_are_validated_independently(tmp_path):
+    models_root = tmp_path / "models"
+    workflow_root = tmp_path / "workflows"
+    (models_root / "checkpoints").mkdir(parents=True)
+    workflow_root.mkdir()
+    (models_root / "checkpoints" / "checkpoint.safetensors").write_bytes(b"model")
+    (workflow_root / "workflow.json").write_text(json.dumps({
+        "0": {"class_type": "ModelNode", "inputs": {"model_name": "checkpoint.safetensors"}},
+        "1": {"class_type": "Inputs", "inputs": {"text": "", "negative": "", "character": "", "product": ""}},
+        "9": {"class_type": "Output", "inputs": {"images": ["1", 0]}},
+    }), encoding="utf-8")
+    model = ImageModelConfig(
+        model_id="sd15", display_name="SD1.5", workflow_file="workflow.json",
+        model_files=[ModelFileRequirement(
+            path="checkpoints/checkpoint.safetensors",
+            workflow_value="checkpoint.safetensors",
+        )],
+        output_node_ids=["9"], injections={
+            "positive_prompt": InjectionTarget(node_id="1", input="text"),
+            "negative_prompt": InjectionTarget(node_id="1", input="negative"),
+            "character_reference": InjectionTarget(node_id="1", input="character"),
+            "product_reference": InjectionTarget(node_id="1", input="product"),
+        },
+    )
+    capabilities = ImageStudioCapabilities(ImageStudioConfig(
+        comfyui_install_path=str(tmp_path), models_path=str(models_root),
+        workflows_path=str(workflow_root), models=[model],
+    ))
+
+    assert capabilities._missing_for_model(model, None) == []
+
+    model.model_files[0].workflow_value = "wrong-loader-value.safetensors"
+    with pytest.raises(ConfigurationError, match="wrong-loader-value"):
+        ImageWorkflowManager(workflow_root).load_and_validate(model)
+
+
+def test_arbitrary_unet_choices_do_not_create_a_capability_false_positive(tmp_path):
+    (tmp_path / "models").mkdir()
+    (tmp_path / "custom_nodes").mkdir()
+    (tmp_path / "workflow.json").write_text(json.dumps({
+        "0": {"class_type": "ModelNode", "inputs": {"model_name": "missing.safetensors"}},
+        "1": {"class_type": "Inputs", "inputs": {"text": "", "negative": "", "character": "", "product": ""}},
+        "9": {"class_type": "Output", "inputs": {"images": ["1", 0]}},
+    }), encoding="utf-8")
+    model = ImageModelConfig(
+        model_id="missing", display_name="Missing image model", workflow_file="workflow.json",
+        model_files=[ModelFileRequirement(
+            path="checkpoints/missing.safetensors",
+            workflow_value="missing.safetensors",
+        )],
+        output_node_ids=["9"], injections={
+            "positive_prompt": InjectionTarget(node_id="1", input="text"),
+            "negative_prompt": InjectionTarget(node_id="1", input="negative"),
+            "character_reference": InjectionTarget(node_id="1", input="character"),
+            "product_reference": InjectionTarget(node_id="1", input="product"),
+        },
+    )
+    config = ImageStudioConfig(
+        comfyui_install_path=str(tmp_path), workflows_path=str(tmp_path), models=[model],
+    )
+    capabilities = ImageStudioCapabilities(config)
+    capabilities._probe_api = lambda: ({
+        "reachable": True, "api_available": True, "checks": {},
+    }, {
+        "UNETLoader": {"input": {"required": {"unet_name": [[
+            "wan2.1_t2v_1.3B_fp16.safetensors",
+            "qwen_image_vae.safetensors",
+            "clip_l.safetensors",
+        ]]}}},
+        "ModelNode": {"input": {"required": {"model_name": [["missing.safetensors"]]}}, "output": ["MODEL"]},
+        "Inputs": {"input": {"required": {
+            "text": ["STRING"], "negative": ["STRING"],
+            "character": ["STRING"], "product": ["STRING"],
+        }}, "output": ["IMAGE"]},
+        "Output": {"input": {"required": {"images": ["IMAGE"]}}, "output": [], "output_node": True},
+    })
+
+    report = capabilities.report()
+
+    assert report["runtime_models"]["unets"]
+    assert report["runtime_models"]["generation_model_files_detected"] is False
+    assert report["generation_available"] is False
+    assert "MODEL_FILE_NOT_FOUND" in {
+        item["code"] for item in report["model_checks"][0]["missing_requirements"]
+    }
+    assert "NO_SUITABLE_IMAGE_MODEL" in {item["code"] for item in report["missing_requirements"]}
 
 
 def test_default_capabilities_report_no_unverified_model_or_workflow(api_request):
@@ -243,7 +437,7 @@ def test_image_recovery_only_resubmits_executable_active_jobs():
     (root / "workflow.json").write_text(json.dumps(workflow), encoding="utf-8")
     model = ImageModelConfig(
         model_id="verified_test_model", display_name="Verified test model", workflow_file="workflow.json",
-        model_files=["checkpoint.safetensors"], output_node_ids=["9"],
+        model_files=[ModelFileRequirement(path="checkpoints/checkpoint.safetensors", workflow_value="checkpoint.safetensors")], output_node_ids=["9"],
         injections={
             "positive_prompt": InjectionTarget(node_id="1", input="text"),
             "negative_prompt": InjectionTarget(node_id="2", input="text"),

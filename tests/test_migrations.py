@@ -159,6 +159,11 @@ def test_database_migrations_upgrade_and_downgrade(tmp_path) -> None:
         "creator_match_evidence",
         "creator_sources",
         "creator_industries",
+        "social_inventory_sources",
+        "social_inventory_runs",
+        "social_inventory_items",
+        "social_inventory_metric_snapshots",
+        "social_inventory_comments",
     }
     assert revision == CURRENT_SCHEMA_REVISION
     assert expected_tables == set(inspect(engine).get_table_names())

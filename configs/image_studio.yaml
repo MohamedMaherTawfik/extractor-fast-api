@@ -12,4 +12,16 @@ comfyui_install_path: null
 custom_nodes_path: null
 models_path: null
 workflows_path: comfyui_image_workflows
+
+# Models opt into a named dimension profile through `dimension_profile`.
+# Keeping dimensions outside workflow code allows each future architecture to
+# define a GPU-safe launch envelope without changing another model's behavior.
+dimension_profiles:
+  sd15_gtx1070:
+    "1:1": { width: 512, height: 512 }
+    "4:5": { width: 512, height: 640 }
+    "3:4": { width: 576, height: 768 }
+    "9:16": { width: 432, height: 768 }
+    "16:9": { width: 768, height: 432 }
+
 models: []

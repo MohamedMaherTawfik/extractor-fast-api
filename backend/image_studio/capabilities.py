@@ -37,23 +37,27 @@ class ImageStudioCapabilities:
                 "code": "COMFYUI_INSTALLATION_NOT_CONFIGURED",
                 "message": "Set EMY_IMAGE_STUDIO_COMFYUI_INSTALL_PATH in the local .env to enable filesystem verification.",
             })
-        if not runtime_models["generation_model_files_detected"]:
-            missing.append({
-                "code": "NO_LOCAL_IMAGE_MODEL",
-                "message": "ComfyUI reports no available checkpoint or UNet model files for local image generation.",
-            })
-
+        suitable_declared_model = False
         for model in self.config.models:
             model_missing = self._missing_for_model(model, object_info)
+            suitable = not model_missing and model.enabled
+            suitable_declared_model = suitable_declared_model or suitable
             model_checks.append({
                 "model_id": model.model_id,
                 "enabled": model.enabled,
-                "available": not model_missing and model.enabled and api["api_available"],
+                "available": suitable and api["api_available"],
                 "missing_requirements": model_missing,
             })
-            if not model_missing and model.enabled and api["api_available"]:
+            if suitable and api["api_available"]:
                 available_models.append(self._public_model(model))
             missing.extend(model_missing)
+
+        runtime_models["generation_model_files_detected"] = suitable_declared_model
+        if not suitable_declared_model:
+            missing.append({
+                "code": "NO_LOCAL_IMAGE_MODEL",
+                "message": "No enabled configured image model has satisfied its declared files, nodes, and workflow requirements.",
+            })
 
         if not self.config.models:
             missing.append({
@@ -129,7 +133,9 @@ class ImageStudioCapabilities:
             "text_encoders": _node_choices(object_info, "CLIPLoader", "clip_name"),
             "vaes": _node_choices(object_info, "VAELoader", "vae_name"),
         }
-        choices["generation_model_files_detected"] = bool(choices["checkpoints"] or choices["unets"])
+        # Raw loader choices are diagnostic only. A declared model is marked as
+        # detected by report() after all of its requirements have been verified.
+        choices["generation_model_files_detected"] = False
         return choices
 
     def _path(self, configured: str | None) -> Path | None:
@@ -167,7 +173,8 @@ class ImageStudioCapabilities:
         if not models_root:
             missing.append({"code": "MODEL_FILES_ROOT_NOT_FOUND", "message": "The configured ComfyUI models directory was not found."})
         else:
-            for relative in model.model_files:
+            for requirement in model.model_files:
+                relative = requirement.path
                 candidate = (models_root / relative).resolve()
                 if not candidate.is_relative_to(models_root.resolve()) or not candidate.is_file():
                     missing.append({"code": "MODEL_FILE_NOT_FOUND", "model_file": relative, "message": f"Required model file is missing: {relative}"})

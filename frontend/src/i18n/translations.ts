@@ -2,6 +2,7 @@ export type Language = "ar" | "en";
 
 const messages = {
   ar: {
+    socialInventory: "جرد السوشيال ميديا",
     videoStudio: "استوديو الفيديو بالذكاء الاصطناعي", imageStudio: "استوديو صور المنتج", creatorDiscovery: "اكتشاف صناع المحتوى",
     home: "الرئيسية", leads: "اكتساب البيانات", content: "المحتوى", intelligence: "الذكاء", patterns: "الأنماط والوصفات", rules: "القواعد",
     generation: "التوليد", assets: "الأصول", calendar: "تقويم المحتوى", products: "المنتجات", customers: "العملاء",
@@ -10,6 +11,7 @@ const messages = {
     search: "ابحث في النظام…", online: "متصل", operator: "وضع المشغّل", empty: "لا توجد بيانات حتى الآن", retry: "إعادة المحاولة",
   },
   en: {
+    socialInventory: "Social Inventory",
     videoStudio: "AI Video Studio", imageStudio: "AI Product Image Studio", creatorDiscovery: "Creator Discovery",
     home: "Home", leads: "Data Acquisition", content: "Content", intelligence: "Intelligence", patterns: "Patterns & Recipes", rules: "Rules",
     generation: "Generation", assets: "Assets", calendar: "Content Calendar", products: "Products", customers: "Customers",

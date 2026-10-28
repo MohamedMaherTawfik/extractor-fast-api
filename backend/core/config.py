@@ -147,6 +147,31 @@ class Settings(BaseSettings):
     run_live_foursquare_tests: bool = False
     google_places_api_key: str | None = Field(default=None, repr=False)
     foursquare_api_key: str | None = Field(default=None, repr=False)
+    social_inventory_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("SOCIAL_INVENTORY_ENABLED", "EMY_SOCIAL_INVENTORY_ENABLED"),
+    )
+    social_inventory_default_provider: str = Field(
+        default="apify",
+        validation_alias=AliasChoices("SOCIAL_INVENTORY_DEFAULT_PROVIDER", "EMY_SOCIAL_INVENTORY_DEFAULT_PROVIDER"),
+    )
+    social_inventory_max_items: int = Field(default=500, ge=1, le=10_000, validation_alias=AliasChoices("SOCIAL_INVENTORY_MAX_ITEMS", "EMY_SOCIAL_INVENTORY_MAX_ITEMS"))
+    social_inventory_max_comments_per_post: int = Field(default=100, ge=0, le=1_000, validation_alias=AliasChoices("SOCIAL_INVENTORY_MAX_COMMENTS_PER_POST", "EMY_SOCIAL_INVENTORY_MAX_COMMENTS_PER_POST"))
+    social_inventory_page_size: int = Field(default=100, ge=1, le=1_000, validation_alias=AliasChoices("SOCIAL_INVENTORY_PAGE_SIZE", "EMY_SOCIAL_INVENTORY_PAGE_SIZE"))
+    social_inventory_http_timeout: float = Field(default=30, gt=0, le=300, validation_alias=AliasChoices("SOCIAL_INVENTORY_HTTP_TIMEOUT", "EMY_SOCIAL_INVENTORY_HTTP_TIMEOUT"))
+    social_inventory_max_retries: int = Field(default=3, ge=0, le=10, validation_alias=AliasChoices("SOCIAL_INVENTORY_MAX_RETRIES", "EMY_SOCIAL_INVENTORY_MAX_RETRIES"))
+    apify_api_base_url: str = Field(default="https://api.apify.com/v2", validation_alias=AliasChoices("APIFY_API_BASE_URL", "EMY_APIFY_API_BASE_URL"))
+    apify_api_token: str | None = Field(default=None, repr=False, validation_alias=AliasChoices("APIFY_API_TOKEN", "EMY_APIFY_API_TOKEN"))
+    apify_instagram_actor_id: str | None = Field(default=None, validation_alias=AliasChoices("APIFY_INSTAGRAM_ACTOR_ID", "EMY_APIFY_INSTAGRAM_ACTOR_ID"))
+    apify_tiktok_actor_id: str | None = Field(default=None, validation_alias=AliasChoices("APIFY_TIKTOK_ACTOR_ID", "EMY_APIFY_TIKTOK_ACTOR_ID"))
+    apify_facebook_actor_id: str | None = Field(default=None, validation_alias=AliasChoices("APIFY_FACEBOOK_ACTOR_ID", "EMY_APIFY_FACEBOOK_ACTOR_ID"))
+    apify_youtube_actor_id: str | None = Field(default=None, validation_alias=AliasChoices("APIFY_YOUTUBE_ACTOR_ID", "EMY_APIFY_YOUTUBE_ACTOR_ID"))
+    apify_x_actor_id: str | None = Field(default=None, validation_alias=AliasChoices("APIFY_X_ACTOR_ID", "EMY_APIFY_X_ACTOR_ID"))
+    apify_linkedin_actor_id: str | None = Field(default=None, validation_alias=AliasChoices("APIFY_LINKEDIN_ACTOR_ID", "EMY_APIFY_LINKEDIN_ACTOR_ID"))
+    jev_social_enabled: bool = Field(default=False, validation_alias=AliasChoices("JEV_SOCIAL_ENABLED", "EMY_JEV_SOCIAL_ENABLED"))
+    jev_social_command: str | None = Field(default=None, validation_alias=AliasChoices("JEV_SOCIAL_COMMAND", "EMY_JEV_SOCIAL_COMMAND"))
+    jev_social_timeout: float = Field(default=180, gt=0, le=1800, validation_alias=AliasChoices("JEV_SOCIAL_TIMEOUT", "EMY_JEV_SOCIAL_TIMEOUT"))
+    run_live_apify_tests: bool = Field(default=False, validation_alias=AliasChoices("RUN_LIVE_APIFY_TESTS", "EMY_RUN_LIVE_APIFY_TESTS"))
 
     @property
     def database_url(self) -> str:

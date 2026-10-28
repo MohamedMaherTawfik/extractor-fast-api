@@ -11,13 +11,6 @@ from backend.core.exceptions import ConfigurationError
 from backend.image_studio.schemas import ImageModelConfig, ImageStudioSettings
 
 
-RATIO_DIMENSIONS = {
-    "1:1": (1024, 1024), "4:5": (832, 1040), "3:4": (768, 1024),
-    "2:3": (768, 1152), "9:16": (576, 1024), "16:9": (1024, 576),
-    "4:3": (1024, 768), "3:2": (1152, 768), "21:9": (1344, 576),
-    "9:21": (576, 1344), "5:4": (1024, 832), "4:1": (1536, 384),
-    "1:4": (384, 1536), "2:1": (1536, 768), "1:2": (768, 1536),
-}
 PLACEHOLDER_MARKERS = {
     "CONFIGURE_ON_GPU_MACHINE", "TODO", "CHANGE_ME", "PLACEHOLDER", "REPLACE_ME",
 }
@@ -44,7 +37,11 @@ class ImageWorkflowManager:
             raise ConfigurationError("INVALID_WORKFLOW: image workflow must be a non-empty API workflow object")
         self._reject_placeholders(workflow, "image workflow")
         workflow_strings = self._literal_strings(workflow)
-        missing_model_refs = [item for item in model.model_files if item not in workflow_strings]
+        missing_model_refs = [
+            item.workflow_value
+            for item in model.model_files
+            if item.workflow_value not in workflow_strings
+        ]
         if missing_model_refs:
             raise ConfigurationError(
                 "INVALID_WORKFLOW: configured model files are not referenced by the workflow: "
@@ -239,10 +236,11 @@ class ImageWorkflowManager:
 
     def inject(self, workflow: dict[str, Any], *, model: ImageModelConfig, settings: ImageStudioSettings, prompt: str, negative_prompt: str, character_reference: str, product_reference: str, seed: int | None) -> dict[str, Any]:
         compiled = deepcopy(workflow)
-        dimensions = RATIO_DIMENSIONS.get(settings.aspect_ratio)
+        dimensions = model.dimensions.get(settings.aspect_ratio)
         if not dimensions and {"width", "height"} & set(model.injections):
             raise ConfigurationError(
-                "INVALID_WORKFLOW: Custom aspect ratio requires an explicitly configured output size"
+                "INVALID_WORKFLOW: aspect ratio "
+                f"{settings.aspect_ratio} is not configured for model {model.model_id}"
             )
         values: dict[str, Any] = {
             "positive_prompt": prompt, "negative_prompt": negative_prompt,
@@ -250,7 +248,7 @@ class ImageWorkflowManager:
             "seed": seed,
         }
         if dimensions:
-            values["width"], values["height"] = dimensions
+            values["width"], values["height"] = dimensions.width, dimensions.height
         for name, target in model.injections.items():
             if name in values and values[name] is not None:
                 compiled[target.node_id]["inputs"][target.input] = values[name]

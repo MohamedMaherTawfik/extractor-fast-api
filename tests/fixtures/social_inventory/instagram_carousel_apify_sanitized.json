@@ -1,0 +1,27 @@
+{
+  "id": "carousel-1",
+  "type": "Sidecar",
+  "productType": "carousel_container",
+  "shortCode": "CAROUSEL_1",
+  "url": "https://www.instagram.com/p/CAROUSEL_1/",
+  "caption": "Sanitized carousel fixture",
+  "ownerUsername": "carousel.owner",
+  "childPosts": [
+    {
+      "id": "carousel-image",
+      "type": "Image",
+      "displayUrl": "https://scontent.cdninstagram.com/sanitized/carousel-image.jpg",
+      "dimensionsWidth": 1080,
+      "dimensionsHeight": 1350
+    },
+    {
+      "id": "carousel-video",
+      "type": "Video",
+      "displayUrl": "https://scontent.cdninstagram.com/sanitized/carousel-video-thumbnail.jpg",
+      "videoUrl": "https://scontent.cdninstagram.com/sanitized/carousel-video.mp4",
+      "dimensionsWidth": 1080,
+      "dimensionsHeight": 1920,
+      "videoDuration": 9.5
+    }
+  ]
+}

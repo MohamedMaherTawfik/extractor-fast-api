@@ -17,9 +17,19 @@ from backend.core.exceptions import (
     NormalizationError,
     NotFoundError,
 )
+from backend.social_inventory.exceptions import SocialInventoryError
 
 
 def register_exception_handlers(app: FastAPI) -> None:
+    @app.exception_handler(SocialInventoryError)
+    async def social_inventory_handler(request: Request, exc: SocialInventoryError) -> JSONResponse:
+        request_id = request.headers.get("X-Request-ID")
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"success": False, "data": None, "error": {"code": exc.code, "message": exc.message, "retryable": exc.retryable}, "request_id": request_id},
+            headers={"X-Request-ID": request_id} if request_id else None,
+        )
+
     @app.exception_handler(NotFoundError)
     async def not_found_handler(
         request: Request,

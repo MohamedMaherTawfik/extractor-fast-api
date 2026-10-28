@@ -84,14 +84,17 @@ class ImageStudioService:
             uploaded_product = connector.upload_reference(self.storage.reference_path(job.product_image))
             self._progress(job, "BUILDING_WORKFLOW", 20, "Building and validating configured image workflow")
             requested = int(settings.number_of_images)
-            base_seed = settings.seed
+            base_seed = settings.seed if settings.seed is not None else SystemRandom().randint(0, 2_147_483_647)
+            job.seed = base_seed
+            job.settings["seed"] = base_seed
+            self.storage.save_job(job)
             supports_seed = "seed" in model.injections
             for index in range(requested):
                 if self.worker.is_cancelled(job.job_id):
                     raise ComfyUIResponseError(
                         "Image generation was cancelled", stage="generation", code="GENERATION_CANCELLED"
                     )
-                seed = (base_seed + index) if base_seed is not None and supports_seed else None
+                seed = base_seed + index if supports_seed else None
                 compiled = self.workflows.inject(workflow, model=model, settings=settings, prompt=job.prompt, negative_prompt=job.negative_prompt, character_reference=uploaded_character, product_reference=uploaded_product, seed=seed)
                 self._progress(job, "SUBMITTED", 25 + int(index * 55 / requested), f"Submitting image {index + 1} of {requested} to ComfyUI")
                 prompt_id = connector.queue_workflow(compiled)
@@ -157,7 +160,12 @@ class ImageStudioService:
     def regenerate(self, job_id: str, *, same_seed: bool = False) -> ImageStudioJob:
         source = self.storage.get_job(job_id)
         settings = ImageStudioSettings.model_validate(source.settings)
-        settings.seed = source.seed if same_seed else SystemRandom().randint(0, 2_147_483_647)
+        if same_seed:
+            if source.seed is None:
+                raise ConfigurationError("SAME_SEED_UNAVAILABLE: source job has no persisted base seed")
+            settings.seed = source.seed
+        else:
+            settings.seed = SystemRandom().randint(0, 2_147_483_647)
         return self.create(
             character_filename=source.character_image.filename, character_mime=source.character_image.mime_type,
             character_content=self.storage.reference_path(source.character_image).read_bytes(),

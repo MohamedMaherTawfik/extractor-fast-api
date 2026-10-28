@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal, get_args
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 CameraAngle = Literal[
@@ -202,12 +202,34 @@ class InjectionTarget(BaseModel):
     input: str
 
 
+class ModelFileRequirement(BaseModel):
+    """A model's disk location and the literal selected by a ComfyUI loader."""
+
+    path: str = Field(min_length=1)
+    workflow_value: str = Field(min_length=1)
+
+
+class ImageDimensions(BaseModel):
+    width: int = Field(ge=64, le=16384)
+    height: int = Field(ge=64, le=16384)
+
+    @field_validator("width", "height")
+    @classmethod
+    def require_comfyui_alignment(cls, value: int) -> int:
+        if value % 8:
+            raise ValueError("Image dimensions must be divisible by 8")
+        return value
+
+
 class ImageModelConfig(BaseModel):
     model_id: str = Field(min_length=1, max_length=150)
     display_name: str = Field(min_length=1, max_length=200)
 
     workflow_file: str = Field(min_length=1)
-    model_files: list[str] = Field(min_length=1)
+    model_files: list[ModelFileRequirement] = Field(min_length=1)
+
+    dimension_profile: str | None = Field(default=None, min_length=1)
+    dimensions: dict[AspectRatio, ImageDimensions] = Field(default_factory=dict)
 
     required_custom_nodes: list[str] = Field(default_factory=list)
 
@@ -262,6 +284,8 @@ class ImageStudioConfig(BaseModel):
 
     workflows_path: str = "comfyui_image_workflows"
 
+    dimension_profiles: dict[str, dict[AspectRatio, ImageDimensions]] = Field(default_factory=dict)
+
     models: list[ImageModelConfig] = Field(default_factory=list)
 
     @field_validator("models")
@@ -275,6 +299,19 @@ class ImageStudioConfig(BaseModel):
             raise ValueError("Image Studio model IDs must be unique")
 
         return models
+
+    @model_validator(mode="after")
+    def resolve_dimension_profiles(self) -> "ImageStudioConfig":
+        for model in self.models:
+            if not model.dimension_profile:
+                continue
+            profile = self.dimension_profiles.get(model.dimension_profile)
+            if profile is None:
+                raise ValueError(
+                    f"Image Studio dimension profile does not exist: {model.dimension_profile}"
+                )
+            model.dimensions = {**profile, **model.dimensions}
+        return self
 
 
 def options_catalog() -> dict[str, list[str]]:

@@ -82,6 +82,10 @@ from backend.db.models.creator_discovery import (
     CreatorDiscoveryAnalysis, CreatorDiscoveryJob, CreatorDiscoveryProfile,
     CreatorDiscoveryRun, CreatorIndustry, CreatorMatchEvidence, CreatorSource,
 )
+from backend.db.models.social_inventory import (
+    SocialInventoryComment, SocialInventoryItem, SocialInventoryMetricSnapshot,
+    SocialInventoryRun, SocialInventorySource,
+)
 
 __all__ = [
     "AnalysisResult",
@@ -164,6 +168,8 @@ __all__ = [
     "CreatorDiscoveryProfile", "CreatorDiscoveryAccount",
     "CreatorContentSample", "CreatorDiscoveryAnalysis",
     "CreatorMatchEvidence", "CreatorSource", "CreatorIndustry",
+    "SocialInventorySource", "SocialInventoryRun", "SocialInventoryItem",
+    "SocialInventoryMetricSnapshot", "SocialInventoryComment",
 ]
 from backend.db.models.analysis import (
     AnalysisResult,

@@ -1,0 +1,20 @@
+{
+  "id": "image-1",
+  "type": "Image",
+  "shortCode": "IMAGE_1",
+  "caption": "Sanitized image fixture",
+  "url": "https://www.instagram.com/p/IMAGE_1/",
+  "displayUrl": "https://scontent.cdninstagram.com/sanitized/image.jpg",
+  "images": ["https://scontent.cdninstagram.com/sanitized/image.jpg"],
+  "likesCount": 42,
+  "commentsCount": 3,
+  "dimensionsWidth": 1080,
+  "dimensionsHeight": 1080,
+  "ownerId": "owner-image",
+  "ownerUsername": "valid.user_name",
+  "ownerFullName": "Image Owner",
+  "profilePicUrl": "https://scontent.cdninstagram.com/sanitized/avatar.jpg",
+  "followersCount": 1234,
+  "verified": true,
+  "timestamp": "2026-10-20T10:00:00.000Z"
+}
