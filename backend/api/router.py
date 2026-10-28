@@ -19,6 +19,7 @@ from backend.api.video_studio import router as video_studio_router
 from backend.api.image_studio import router as image_studio_router
 from backend.api.creator_discovery import router as creator_discovery_router
 from backend.social_inventory.api import router as social_inventory_router
+from backend.social_intelligence.api import router as social_intelligence_router
 
 
 api_router = APIRouter()
@@ -39,3 +40,4 @@ api_router.include_router(video_studio_router)
 api_router.include_router(image_studio_router)
 api_router.include_router(creator_discovery_router)
 api_router.include_router(social_inventory_router)
+api_router.include_router(social_intelligence_router)

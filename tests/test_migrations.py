@@ -164,6 +164,17 @@ def test_database_migrations_upgrade_and_downgrade(tmp_path) -> None:
         "social_inventory_items",
         "social_inventory_metric_snapshots",
         "social_inventory_comments",
+        "content_analysis_jobs",
+        "content_transcripts",
+        "content_transcript_segments",
+        "content_hook_analyses",
+        "content_copy_analyses",
+        "content_narrative_analyses",
+        "content_video_analyses",
+        "content_video_scenes",
+        "creator_intelligence",
+        "creative_recommendations",
+        "excel_export_jobs",
     }
     assert revision == CURRENT_SCHEMA_REVISION
     assert expected_tables == set(inspect(engine).get_table_names())

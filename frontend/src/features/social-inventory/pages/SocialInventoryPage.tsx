@@ -4,11 +4,13 @@ import { useSearchParams } from "react-router-dom";
 import {
   Download,
   ExternalLink,
+  FileSpreadsheet,
   Grid2X2,
   List,
   Plus,
   RefreshCw,
   Search,
+  Sparkles,
   X,
 } from "lucide-react";
 import { DetailDrawer } from "../../../components/DetailDrawer";
@@ -19,6 +21,9 @@ import {
 } from "../../../components/States";
 import { StatusBadge } from "../../../components/StatusBadge";
 import { socialInventoryApi as client } from "../api/socialInventoryApi";
+import { socialIntelligenceApi } from "../api/socialIntelligenceApi";
+import { ContentAnalysisView } from "../components/ContentAnalysisView";
+import { CreatorIntelligenceView } from "../components/CreatorIntelligenceView";
 import type { CreateSource, Platform, SocialItem } from "../types";
 
 const terminal = new Set(["succeeded", "partial", "failed", "cancelled"]);
@@ -216,7 +221,23 @@ export default function SocialInventoryPage() {
   const [dialog, setDialog] = useState(false);
   const [grid, setGrid] = useState(params.get("view") === "grid");
   const [selected, setSelected] = useState<SocialItem>();
+  const [selectedUuids, setSelectedUuids] = useState<string[]>([]);
   const [report, setReport] = useState<Record<string, unknown>>();
+
+  const analyzeBatchMutation = useMutation({
+    mutationFn: () => socialIntelligenceApi.analyzeBatch(selectedUuids),
+    onSuccess: () => {
+      cache.invalidateQueries({ queryKey: ["social"] });
+      setSelectedUuids([]);
+    },
+  });
+
+  const toggleSelect = (uuid: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedUuids((prev) =>
+      prev.includes(uuid) ? prev.filter((id) => id !== uuid) : [...prev, uuid]
+    );
+  };
   const runs = useQuery({
     queryKey: ["social", "runs"],
     queryFn: client.runs,
@@ -301,7 +322,7 @@ export default function SocialInventoryPage() {
         </button>
       </header>
       <nav className="social-tabs">
-        {["overview", "sources", "content", "runs", "research"].map((value) => (
+        {["overview", "sources", "content", "intelligence", "runs", "research"].map((value) => (
           <button
             key={value}
             className={tab === value ? "active" : ""}
@@ -515,6 +536,37 @@ export default function SocialInventoryPage() {
               onChange={(e) => change("engagement", e.target.value)}
             />
           </div>
+          {selectedUuids.length > 0 && (
+            <div className="batch-toolbar">
+              <span>{selectedUuids.length} selected</span>
+              <div className="batch-actions">
+                <button
+                  className="button primary small"
+                  disabled={analyzeBatchMutation.isPending}
+                  onClick={() => analyzeBatchMutation.mutate()}
+                >
+                  <Sparkles size={13} />
+                  {analyzeBatchMutation.isPending
+                    ? "Queuing..."
+                    : `Analyze Selected (${selectedUuids.length})`}
+                </button>
+                <a
+                  className="button secondary small"
+                  href={socialIntelligenceApi.streamExportUrl()}
+                  download
+                >
+                  <Download size={13} />
+                  Export Selected (.XLSX)
+                </a>
+                <button
+                  className="button ghost small"
+                  onClick={() => setSelectedUuids([])}
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          )}
           {items.isLoading ? (
             <LoadingState />
           ) : items.isError ? (
@@ -535,6 +587,14 @@ export default function SocialInventoryPage() {
                   )}
                   <div>
                     <header>
+                      <input
+                        type="checkbox"
+                        className="item-checkbox"
+                        checked={selectedUuids.includes(item.uuid)}
+                        onClick={(e) => toggleSelect(item.uuid, e)}
+                        onChange={() => {}}
+                        aria-label={`Select ${item.title || item.caption || item.uuid}`}
+                      />
                       <StatusBadge value={item.platform} />
                       <span>
                         {item.published_at
@@ -584,6 +644,15 @@ export default function SocialInventoryPage() {
             </div>
           )}
           <div className="social-export">
+            <a
+              className="button primary"
+              href={socialIntelligenceApi.streamExportUrl()}
+              download
+              title="Export complete 14-sheet Excel intelligence report"
+            >
+              <FileSpreadsheet size={15} />
+              Full 14-Sheet Excel Intelligence Report (.xlsx)
+            </a>
             <Download size={15} />
             {(["csv", "xlsx", "json"] as const).map((format) => (
               <a
@@ -596,6 +665,11 @@ export default function SocialInventoryPage() {
               </a>
             ))}
           </div>
+        </section>
+      )}
+      {tab === "intelligence" && (
+        <section className="panel" style={{ padding: "16px" }}>
+          <CreatorIntelligenceView />
         </section>
       )}
       {tab === "runs" && (
@@ -724,9 +798,13 @@ export default function SocialInventoryPage() {
       />
       <DetailDrawer
         item={selected as unknown as Record<string, unknown> | undefined}
-        title={selected?.title || "Content details"}
+        title={selected?.title || selected?.caption?.slice(0, 45) || "Content details"}
         onClose={() => setSelected(undefined)}
-      />
+      >
+        {selected && (
+          <ContentAnalysisView item={selected} onClose={() => setSelected(undefined)} />
+        )}
+      </DetailDrawer>
     </section>
   );
 }
