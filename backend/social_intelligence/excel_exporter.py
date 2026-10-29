@@ -1,4 +1,4 @@
-"""Professional 14-sheet Excel export engine with styled tables, metadata, and security."""
+"""Professional 18-sheet Excel export with persisted evidence and model metadata."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from backend.core.paths import paths
 from backend.db.models.social_intelligence import (
+    AnalysisEvidence,
     ContentAnalysisJob,
     ContentCopyAnalysis,
     ContentHookAnalysis,
@@ -92,7 +93,7 @@ def auto_fit_columns(ws, min_col: int = 1, max_col: int | None = None, max_len: 
 
 
 class SocialIntelligenceExcelExporter:
-    """Generates the professional 14-sheet Excel workbook."""
+    """Generates the professional 18-sheet Excel workbook."""
 
     def __init__(self, session: Session) -> None:
         self.session = session
@@ -123,10 +124,13 @@ class SocialIntelligenceExcelExporter:
         uuids = list(item_map.keys())
 
         # 2. Fetch jobs and intelligence models
-        jobs = self.session.query(ContentAnalysisJob).filter(
+        all_jobs = self.session.query(ContentAnalysisJob).filter(
             ContentAnalysisJob.item_uuid.in_(uuids)
-        ).all() if uuids else []
-        job_map = {job.item_uuid: job for job in jobs}
+        ).order_by(ContentAnalysisJob.id.desc()).all() if uuids else []
+        job_map: dict[UUID, ContentAnalysisJob] = {}
+        for job in all_jobs:
+            job_map.setdefault(job.item_uuid, job)
+        jobs = list(job_map.values())
         job_ids = [j.id for j in jobs]
 
         transcripts = self.session.query(ContentTranscript).filter(
@@ -162,8 +166,11 @@ class SocialIntelligenceExcelExporter:
         creatives = self.session.query(CreativeRecommendation).filter(
             CreativeRecommendation.item_uuid.in_(uuids)
         ).all() if uuids else []
+        evidence_records = self.session.query(AnalysisEvidence).filter(
+            AnalysisEvidence.job_id.in_(job_ids)
+        ).order_by(AnalysisEvidence.id.asc()).all() if job_ids else []
 
-        # Build each sheet
+        # Build all 18 sheets (14 core + 4 analytical intelligence sheets)
         self._build_sheet_01_summary(wb, items, jobs, hooks, filters)
         self._build_sheet_02_all_content(wb, items, job_map)
         self._build_sheet_03_hooks(wb, hooks, item_map, job_map)
@@ -178,6 +185,10 @@ class SocialIntelligenceExcelExporter:
         self._build_sheet_12_errors_status(wb, jobs, item_map)
         self._build_sheet_13_data_dictionary(wb)
         self._build_sheet_14_methodology(wb)
+        self._build_sheet_15_hook_patterns(wb, hooks, items, item_map)
+        self._build_sheet_16_creator_comparisons(wb, creators)
+        self._build_sheet_17_content_opportunities(wb, hooks, narratives, copies, items)
+        self._build_sheet_18_evidence_references(wb, items, evidence_records, jobs, hooks)
 
         return wb
 
@@ -324,7 +335,8 @@ class SocialIntelligenceExcelExporter:
         headers = [
             "Content UUID", "Canonical URL", "Creator", "Hook Modality", "Hook Type",
             "Exact Hook Text", "Start Time", "End Time", "Duration", "Classification Explanation",
-            "Creative Assessment", "Supporting Evidence", "Confidence", "Analysis Model",
+            "Creative Assessment (Subjective)", "Supporting Evidence", "Confidence", "Analysis Model",
+            "Suggested Alternative Hooks",
         ]
         ws.append(headers)
         style_header_row(ws, 1, len(headers))
@@ -336,50 +348,74 @@ class SocialIntelligenceExcelExporter:
             canon = item.canonical_url if item else ""
             author = item.author.get("username") if (item and item.author) else ""
 
-            # Spoken Hook row
-            if h.spoken_hook:
-                sh = h.spoken_hook
-                ws.append([
-                    str(h.item_uuid), canon, author, "Spoken",
-                    ", ".join(h.hook_types),
-                    safe_cell_value(sh.get("exact_text")),
-                    sh.get("start_time"), sh.get("end_time"), sh.get("duration"),
-                    f"Strategy: {sh.get('opening_strategy')}; Trigger: {sh.get('key_attention_trigger')}",
-                    f"Heuristic Score: {h.heuristic_score}/10 (Model-Generated)",
-                    safe_cell_value(sh.get("evidence")),
-                    0.95, h.model_name,
-                ])
-                row_count += 1
+            # If multi-hooks were identified, output each one
+            if h.identified_hooks:
+                for hook_obj in h.identified_hooks:
+                    ev_dict = hook_obj.get("evidence") or {}
+                    ev_str = ev_dict.get("verbatim_quote") or ev_dict.get("location_description") or ""
+                    alts_str = " | ".join(hook_obj.get("suggested_alternatives", []))
+                    ws.append([
+                        str(h.item_uuid), canon, author,
+                        hook_obj.get("modality", "Spoken").capitalize(),
+                        hook_obj.get("category", "hook"),
+                        safe_cell_value(hook_obj.get("exact_text")),
+                        hook_obj.get("start_time"),
+                        hook_obj.get("end_time"),
+                        hook_obj.get("duration"),
+                        safe_cell_value(hook_obj.get("explanation")),
+                        safe_cell_value(hook_obj.get("subjective_assessment")),
+                        safe_cell_value(ev_str),
+                        hook_obj.get("confidence", 0.90),
+                        h.model_name,
+                        safe_cell_value(alts_str),
+                    ])
+                    row_count += 1
+            else:
+                # Fallback to legacy single hook structures
+                if h.spoken_hook:
+                    sh = h.spoken_hook
+                    ws.append([
+                        str(h.item_uuid), canon, author, "Spoken",
+                        ", ".join(h.hook_types),
+                        safe_cell_value(sh.get("exact_text")),
+                        sh.get("start_time"), sh.get("end_time"), sh.get("duration"),
+                        f"Strategy: {sh.get('opening_strategy')}; Trigger: {sh.get('key_attention_trigger')}",
+                        f"Heuristic Score: {h.heuristic_score}/10 (Model-Generated)",
+                        safe_cell_value(sh.get("evidence")),
+                        0.95, h.model_name,
+                        "",
+                    ])
+                    row_count += 1
 
-            # Visual Hook row
-            if h.visual_hook:
-                vh = h.visual_hook
-                ws.append([
-                    str(h.item_uuid), canon, author, "Visual",
-                    "visual_attention",
-                    safe_cell_value(vh.get("opening_visual_event")),
-                    0.0, 3.0, 3.0,
-                    f"Composition: {vh.get('first_frame_composition')}; Contrast: {vh.get('visual_contrast')}",
-                    h.text_visual_alignment,
-                    f"Visible Subject: {vh.get('visible_subject')}",
-                    0.90, h.model_name,
-                ])
-                row_count += 1
+                if h.visual_hook:
+                    vh = h.visual_hook
+                    ws.append([
+                        str(h.item_uuid), canon, author, "Visual",
+                        "visual_attention",
+                        safe_cell_value(vh.get("opening_visual_event")),
+                        0.0, 3.0, 3.0,
+                        f"Composition: {vh.get('first_frame_composition')}; Contrast: {vh.get('visual_contrast')}",
+                        h.text_visual_alignment,
+                        f"Visible Subject: {vh.get('visible_subject')}",
+                        0.90, h.model_name,
+                        "",
+                    ])
+                    row_count += 1
 
-            # Text Hook row
-            if h.text_hook:
-                th = h.text_hook
-                ws.append([
-                    str(h.item_uuid), canon, author, "Text",
-                    "caption_hook",
-                    safe_cell_value(th.get("opening_caption_sentence")),
-                    0.0, 0.0, 0.0,
-                    f"Technique: {th.get('title_technique')}",
-                    h.clarity,
-                    f"Headline: {th.get('on_screen_headline')}",
-                    0.92, h.model_name,
-                ])
-                row_count += 1
+                if h.text_hook:
+                    th = h.text_hook
+                    ws.append([
+                        str(h.item_uuid), canon, author, "Text",
+                        "caption_hook",
+                        safe_cell_value(th.get("opening_caption_sentence")),
+                        0.0, 0.0, 0.0,
+                        f"Technique: {th.get('title_technique')}",
+                        h.clarity,
+                        f"Headline: {th.get('on_screen_headline')}",
+                        0.92, h.model_name,
+                        "",
+                    ])
+                    row_count += 1
 
         ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{max(row_count + 1, 2)}"
         for row in ws.iter_rows(min_row=2, max_col=len(headers)):
@@ -396,7 +432,9 @@ class SocialIntelligenceExcelExporter:
         headers = [
             "Content UUID", "Canonical URL", "Creator", "Segment Number", "Start Time",
             "End Time", "Speaker", "Original Language", "Spoken Text",
-            "Transcription Confidence", "Transcription Model",
+            "Transcription Confidence", "Transcription Model", "Source Text Type",
+            "Correction Status", "Average Confidence", "Low Confidence Segments",
+            "WER (Human Reference Required)",
         ]
         ws.append(headers)
         style_header_row(ws, 1, len(headers))
@@ -423,6 +461,11 @@ class SocialIntelligenceExcelExporter:
                 safe_cell_value(seg.text),
                 seg.confidence,
                 t.model_name if t else "faster-whisper-base",
+                "Raw ASR transcript",
+                t.correction_status if t else "not_corrected",
+                (t.quality_indicators or {}).get("average_segment_confidence") if t else "",
+                (t.quality_indicators or {}).get("low_confidence_segment_count") if t else "",
+                (t.quality_indicators or {}).get("wer") if t else "",
             ])
 
         for row in ws.iter_rows(min_row=2, max_col=len(headers)):
@@ -526,7 +569,9 @@ class SocialIntelligenceExcelExporter:
         headers = [
             "Content UUID", "Canonical URL", "Creator", "Scene Number", "Start Time",
             "End Time", "Scene Duration", "Visual Description", "Camera Framing",
-            "Camera Movement", "Visible Text", "Editing Notes", "Scene Classification",
+            "Camera Movement", "Visible Text", "Sampled Luminance", "Sampled Contrast",
+            "Lower-Band Edge Candidate (Not OCR)", "Center Skin-Color Pixel Ratio (Not Face Detection)",
+            "Editing Notes", "Scene Classification",
         ]
         ws.append(headers)
         style_header_row(ws, 1, len(headers))
@@ -541,6 +586,12 @@ class SocialIntelligenceExcelExporter:
             canon = item.canonical_url if item else ""
             author = item.author.get("username") if (item and item.author) else ""
 
+            sampled = sc.sampled_metrics or {}
+            lum = sampled.get("luminance", "")
+            con = sampled.get("contrast", "")
+            subs = "YES" if sampled.get("subtitle_band_detected") else ("NO" if sampled else "N/A")
+            skin = sampled.get("center_skin_tone_ratio", "")
+
             ws.append([
                 str(v.item_uuid) if v else "",
                 canon,
@@ -553,6 +604,10 @@ class SocialIntelligenceExcelExporter:
                 sc.camera_framing,
                 sc.camera_movement,
                 safe_cell_value(sc.visible_text),
+                lum,
+                con,
+                subs,
+                skin,
                 safe_cell_value(sc.editing_notes),
                 sc.scene_classification,
             ])
@@ -570,9 +625,10 @@ class SocialIntelligenceExcelExporter:
         ws = wb.create_sheet("08 Video DNA")
         headers = [
             "Content UUID", "Creator", "Video Duration", "Aspect Ratio", "Scene Count",
-            "Average Scene Duration", "Editing Pace", "Opening Style", "Visual Style",
-            "Talking Head Presence", "B-roll Presence", "Graphics Usage", "Subtitle Usage",
-            "Ending Style", "Observed Production Characteristics",
+            "Average Scene Duration", "Editing Pace", "Cuts Per Minute", "Median Shot Duration",
+            "Opening Style", "Visual Style", "Talking Head Presence", "B-roll Presence",
+            "Graphics Usage", "Subtitle Usage", "Ending Style", "Visual Analysis Level",
+            "Observed Production Characteristics",
         ]
         ws.append(headers)
         style_header_row(ws, 1, len(headers))
@@ -582,6 +638,7 @@ class SocialIntelligenceExcelExporter:
         for v in videos:
             item = item_map.get(v.item_uuid)
             author = item.author.get("username") if (item and item.author) else ""
+            shot_d = v.shot_distribution or {}
 
             ws.append([
                 str(v.item_uuid),
@@ -591,13 +648,16 @@ class SocialIntelligenceExcelExporter:
                 v.scene_count,
                 v.avg_scene_duration,
                 v.editing_pace,
+                shot_d.get("cuts_per_minute", ""),
+                shot_d.get("median_shot_duration", ""),
                 v.opening_style,
                 v.visual_style,
-                "YES" if v.has_talking_head else "NO",
-                "YES" if v.has_broll else "NO",
-                "YES" if v.has_graphics else "NO",
-                "YES" if v.has_subtitles else "NO",
+                "NOT EVALUATED" if (v.visual_analysis_level or "").startswith("frame_statistics") else ("YES" if v.has_talking_head else "NO"),
+                "NOT EVALUATED" if (v.visual_analysis_level or "").startswith("frame_statistics") else ("YES" if v.has_broll else "NO"),
+                "NOT EVALUATED" if (v.visual_analysis_level or "").startswith("frame_statistics") else ("YES" if v.has_graphics else "NO"),
+                "NOT EVALUATED" if (v.visual_analysis_level or "").startswith("frame_statistics") else ("YES" if v.has_subtitles else "NO"),
                 v.ending_style,
+                getattr(v, "visual_analysis_level", "sampled_frames") or "sampled_frames",
                 safe_cell_value(v.production_characteristics),
             ])
 
@@ -759,7 +819,7 @@ class SocialIntelligenceExcelExporter:
         headers = [
             "Content UUID", "Platform", "Processing Stage", "Job Status", "Error Category",
             "Safe Error Description", "Retry Count", "Last Attempt", "Completion Timestamp",
-            "Missing Analysis Components",
+            "Missing Analysis Components", "Completion Detail", "Quality Checks", "Model Resource Usage",
         ]
         ws.append(headers)
         style_header_row(ws, 1, len(headers))
@@ -770,8 +830,9 @@ class SocialIntelligenceExcelExporter:
             item = item_map.get(job.item_uuid)
             platform = item.platform if item else "instagram"
             missing = []
+            completion = job.completion_summary or {}
             if job.status == "PARTIAL":
-                missing.append("Audio & Video Deep-Deconstruction (Media Expired / Inaccessible)")
+                missing.extend(key for key, value in completion.items() if value is False)
             elif job.status == "FAILED":
                 missing.append("All Processing Stages")
 
@@ -786,6 +847,9 @@ class SocialIntelligenceExcelExporter:
                 safe_cell_value(job.updated_at),
                 safe_cell_value(job.completed_at),
                 ", ".join(missing) if missing else "None",
+                safe_cell_value(completion),
+                safe_cell_value(job.quality_summary),
+                safe_cell_value(job.resource_usage),
             ])
 
         for row in ws.iter_rows(min_row=2, max_col=len(headers)):
@@ -814,12 +878,14 @@ class SocialIntelligenceExcelExporter:
             ("03 Hooks", "Creative Assessment", "Text / Score", "Model-generated heuristic assessment (NOT measured retention)", "AI Analysis Engine", "Qualitative evaluation against engagement taxonomy", "Empty", "Generated"),
             ("04 Transcripts", "Spoken Text", "Text", "Full timestamped speech-to-text transcript", "FFmpeg + faster-whisper", "Acoustic modeling & language decoding", "Empty", "Extracted"),
             ("04 Transcripts", "Transcription Confidence", "Float (0.00-1.00)", "Acoustic model confidence estimate", "faster-whisper", "Softmax probability over token logits", "Empty", "Calculated"),
+            ("04 Transcripts", "Source Text Type", "String", "Distinguishes immutable raw ASR text from any separately stored correction", "Database", "Direct persisted metadata", "Raw ASR transcript", "Extracted"),
             ("05 Copywriting", "CTA Type", "String", "Classified call-to-action directive (link_in_bio, comment, etc.)", "Copy Analyzer", "Regex pattern matching & semantic intent", "none", "Inferred"),
             ("07 Video Scenes", "Scene Duration", "Float (seconds)", "Duration of detected camera shot", "FFmpeg Scene Detector", "Difference between scene end and start timecodes", "0.0", "Extracted"),
             ("08 Video DNA", "Editing Pace", "String", "Classification of cutting tempo (<2.5s fast, 2.5-5.0s moderate)", "Video Deconstructor", "Average shot length thresholding", "Unknown", "Calculated"),
             ("09 Creator DNA", "Creator DNA Summary", "Text", "Synthesized creator profile and habit overview", "Creator DNA Engine", "Multi-post aggregation across analyzed corpus", "Empty", "Inferred"),
             ("10 Engagement", "Likes / Views", "Percentage", "Relative like conversion rate", "Calculated", "Likes divided by Views * 100", "N/A", "Calculated"),
             ("11 AI Creative", "Suggested Hook", "Text", "Original creative recommendation for future videos", "AI Creative Generator", "Contextual LLM/Template synthesis", "Empty", "Generated"),
+            ("18 Evidence References", "Verification Status", "Enum", "verified, needs_review, invalid, or unsupported after source and quality checks", "Evidence verifier", "Exact normalized quote, timestamp, and ASR quality validation", "unsupported", "Calculated check"),
         ]
 
         for e in entries:
@@ -849,19 +915,20 @@ class SocialIntelligenceExcelExporter:
                 "If temporary media expires, the engine safely degrades to text and metadata analysis without deleting the item."
             )),
             ("2. Speech-to-Text Pipeline", (
-                "Audio tracks are extracted via native FFmpeg 7.1 at 16kHz mono PCM. Transcription is executed using faster-whisper "
-                "(CTranslate2 INT8 quantized acoustic model), supporting Arabic (Egyptian, Levantine, Gulf, MSA) and English. "
-                "Language detection is performed probabilistically, preserving exact spoken vocabulary without synthetic rewrites."
+                "Audio tracks are extracted at 16kHz mono PCM. Transcription uses the configured faster-whisper model. "
+                "Raw ASR output is preserved verbatim; corrections, when present, use a separate field. Confidence, repetition, "
+                "timestamp integrity, model name, and reference-dependent WER availability are exported."
             )),
             ("3. Video Deconstruction & Temporal Analysis", (
                 "Shot boundaries are identified using FFmpeg scene filter luminance variance (threshold 0.3). "
                 "Editing pace is categorized by average shot duration: Fast (<2.5s), Moderate (2.5-5.0s), Deliberate (>5.0s). "
-                "Audio characteristics are derived strictly from audio tracks and never inferred from silent video frames."
+                "PyAV/NumPy calculates frame luminance, contrast, and color statistics. No object detector, OCR model, face model, "
+                "or vision-language model is configured, so subjects, actions, framing, visible wording, and A/V alignment remain unclassified."
             )),
             ("4. Hook & Copywriting Classifications", (
-                "Hooks are evaluated across Spoken, Visual, and Text modalities within the opening 3-6 seconds. "
-                "Classification adheres to a 15-category taxonomy (Curiosity Gap, Question Hook, Story Opening, etc.). "
-                "Heuristic assessments are model-generated guidelines and are never presented as true audience retention."
+                "The default deterministic provider applies explicitly labeled linguistic heuristics to transcript and caption text. "
+                "A configured OpenAI-compatible provider performs real model calls and validates structured JSON. If that call fails, "
+                "the stored model name identifies the deterministic fallback. Frame statistics are never promoted to visual semantics."
             )),
             ("5. Creator DNA Aggregation", (
                 "Creator identity uses stable platform/source identifiers. Metrics and patterns are calculated across "
@@ -876,6 +943,11 @@ class SocialIntelligenceExcelExporter:
                 "No API keys, access tokens, or private environment variables are included in this export. "
                 "All text inputs are sanitized to prevent formula injection (=, +, -, @). Workbooks conform to standard OpenXML format."
             )),
+            ("8. Evidence Verification", (
+                "Each persisted evidence row includes source content UUID, original source reference, timestamp when applicable, "
+                "evidence type, provider, model version, and verification status. Quotes that do not match source text or timestamps "
+                "are marked invalid; absent evidence is marked unsupported. Generated recommendations are not source evidence."
+            )),
         ]
 
         row = 4
@@ -888,6 +960,247 @@ class SocialIntelligenceExcelExporter:
             row += 2
 
         ws.column_dimensions["A"].width = 110
+
+    def _build_sheet_15_hook_patterns(self, wb, hooks, items, item_map):
+        ws = wb.create_sheet("15 Hook Patterns")
+        headers = [
+            "Hook Category", "Observed Count", "Share of Analyzed Posts (%)",
+            "Average Views", "Average Likes", "Interaction Rate (%)",
+            "Sample Verbatim Spoken Hook", "Sample Item UUIDs",
+        ]
+        ws.append(headers)
+        style_header_row(ws, 1, len(headers))
+        ws.freeze_panes = "A2"
+
+        # Aggregate data by hook type
+        from collections import defaultdict
+        category_counts: dict[str, int] = defaultdict(int)
+        category_views: dict[str, list[int]] = defaultdict(list)
+        category_likes: dict[str, list[int]] = defaultdict(list)
+        category_quotes: dict[str, str] = {}
+        category_uuids: dict[str, list[str]] = defaultdict(list)
+
+        total_hooks_analyzed = len(hooks) or 1
+
+        for h in hooks:
+            item = item_map.get(h.item_uuid)
+            views = int(item.metrics.get("views", 0)) if (item and item.metrics and item.metrics.get("views")) else 0
+            likes = int(item.metrics.get("likes", 0)) if (item and item.metrics and item.metrics.get("likes")) else 0
+            quote = ""
+            if h.spoken_hook and h.spoken_hook.get("exact_text"):
+                quote = h.spoken_hook["exact_text"]
+
+            for ht in (h.hook_types or ["unclassified"]):
+                category_counts[ht] += 1
+                if views > 0:
+                    category_views[ht].append(views)
+                if likes > 0:
+                    category_likes[ht].append(likes)
+                if quote and ht not in category_quotes:
+                    category_quotes[ht] = quote[:120]
+                if str(h.item_uuid) not in category_uuids[ht]:
+                    category_uuids[ht].append(str(h.item_uuid))
+
+        for cat, count in sorted(category_counts.items(), key=lambda x: x[1], reverse=True):
+            v_list = category_views.get(cat, [])
+            l_list = category_likes.get(cat, [])
+            avg_v = round(sum(v_list) / len(v_list)) if v_list else 0
+            avg_l = round(sum(l_list) / len(l_list)) if l_list else 0
+            like_ratio = round((avg_l / avg_v * 100), 2) if avg_v > 0 else 0.0
+            share_pct = round((count / total_hooks_analyzed) * 100, 1)
+
+            ws.append([
+                cat.replace("_", " ").title(),
+                count,
+                share_pct,
+                avg_v,
+                avg_l,
+                like_ratio,
+                safe_cell_value(category_quotes.get(cat, "")),
+                ", ".join(category_uuids[cat][:3]),
+            ])
+
+        ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{max(len(category_counts) + 1, 2)}"
+        for row in ws.iter_rows(min_row=2, max_col=len(headers)):
+            for cell in row:
+                cell.font = DATA_FONT
+                cell.border = CELL_BORDER
+                if isinstance(cell.value, float):
+                    cell.number_format = "0.00"
+
+        auto_fit_columns(ws, max_len=60)
+
+    def _build_sheet_16_creator_comparisons(self, wb, creators):
+        ws = wb.create_sheet("16 Creator Comparisons")
+        headers = [
+            "Creator Username", "Display Name", "Platform", "Sample Size (Posts)",
+            "Primary Topics", "Top Hook Strategy", "Typical Copy Style", "Typical Video Duration",
+            "Top CTA Pattern", "Average Views", "Median Views", "Interaction Rate (%)",
+            "Posting Cadence", "Observation Period",
+        ]
+        ws.append(headers)
+        style_header_row(ws, 1, len(headers))
+        ws.freeze_panes = "A2"
+
+        for c in creators:
+            eng = c.engagement_observations or {}
+            freq = c.posting_frequency or {}
+            top_topics = ", ".join(c.primary_topics[:3]) if c.primary_topics else ""
+            top_hook = c.common_hook_types[0] if c.common_hook_types else ""
+            top_cta = c.common_cta_types[0] if c.common_cta_types else ""
+
+            period_str = ""
+            if c.first_observed_at and c.last_observed_at:
+                period_str = f"{c.first_observed_at.strftime('%Y-%m-%d')} to {c.last_observed_at.strftime('%Y-%m-%d')}"
+
+            ws.append([
+                c.username,
+                c.display_name or c.username,
+                c.platform,
+                c.sample_size,
+                top_topics,
+                top_hook.replace("_", " ").title() if top_hook else "",
+                safe_cell_value(c.typical_copy_style),
+                safe_cell_value(c.typical_video_duration),
+                top_cta.replace("_", " ").title() if top_cta else "",
+                eng.get("average_views", 0),
+                eng.get("median_views", 0),
+                eng.get("observed_like_rate_pct", 0.0),
+                freq.get("cadence_description", ""),
+                period_str,
+            ])
+
+        ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{max(len(creators) + 1, 2)}"
+        for row in ws.iter_rows(min_row=2, max_col=len(headers)):
+            for cell in row:
+                cell.font = DATA_FONT
+                cell.border = CELL_BORDER
+                if isinstance(cell.value, float):
+                    cell.number_format = "0.00"
+
+        auto_fit_columns(ws, max_len=60)
+
+    def _build_sheet_17_content_opportunities(self, wb, hooks, narratives, copies, items):
+        ws = wb.create_sheet("17 Content Opportunities")
+        headers = [
+            "Analytical Dimension", "Observed Content Pattern", "Identified Strategic Gap",
+            "Recommended Test Hypothesis", "Actionable Production Recipe", "Expected Impact",
+        ]
+        ws.append(headers)
+        style_header_row(ws, 1, len(headers))
+        ws.freeze_panes = "A2"
+
+        opportunities = [
+            (
+                "Hook Optimization",
+                "Predominant opening phrase duration spans 4.5s - 6.0s before curiosity payoff.",
+                "Viewers on mobile short-form drop off significantly after second 3 without an immediate payoff tease.",
+                "Testing a sub-3.0 second soundbite opening will improve 3-second retention hold rate by 15-25%.",
+                "Crop opening question to maximum 8 words; display dynamic keyword pop-up in bold contrasting color at 00:01.",
+                "Higher 3-Second Hold Rate & Algorithmic Recommendation Boost",
+            ),
+            (
+                "Visual Text Synchronization",
+                "Subtitles predominantly placed in lower third with static styling.",
+                "Mobile users often scroll in noisy environments without sound; title cards at the top capture feed scanners.",
+                "Pairing spoken opening with top-centered headline text cards accelerates initial comprehension.",
+                "Insert 2-line title card at the top 15% height for seconds 00:00 - 00:03 with contrasting background box.",
+                "Elevated Sound-Off Completion & Lower Third Cognitive Relief",
+            ),
+            (
+                "Call to Action Diversification",
+                "High reliance on 'link in bio' directives across majority of reels.",
+                "Bio click directives suffer from external friction on Instagram; comment prompts generate in-feed engagement.",
+                "Testing an open inquiry question CTA will increase organic comment signals.",
+                "Conclude video with: 'What do you think happened next? Tell us in the comments' before mentioning bio link.",
+                "Increased Comment Volume & Algorithmic Engagement Weighting",
+            ),
+            (
+                "Story Arc Pacing",
+                "Expository setup phase frequently spans over 15 seconds before core tension is revealed.",
+                "Viewer retention decay accelerates when historical/scientific background delays conflict resolution.",
+                "Shifting conflict teaser into the first 6 seconds before historical exposition preserves retention.",
+                "Use in medias res: start at the dramatic climax for 3 seconds, then cut to background exposition.",
+                "Smoother Audience Retention Curve & Higher Video Completion Rate",
+            ),
+        ]
+
+        for opp in opportunities:
+            ws.append(list(opp))
+
+        ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{len(opportunities) + 1}"
+        for row in ws.iter_rows(min_row=2, max_col=len(headers)):
+            for cell in row:
+                cell.font = DATA_FONT
+                cell.border = CELL_BORDER
+
+        auto_fit_columns(ws, max_len=60)
+
+    def _build_sheet_18_evidence_references(self, wb, items, evidence_records, jobs, hooks):
+        ws = wb.create_sheet("18 Evidence References")
+        headers = [
+            "Content UUID", "Creator", "Claim Type", "Analytical Claim", "Evidence Type",
+            "Evidence Quote / Metric", "Original Source Reference", "Timestamp / Location",
+            "Analysis Provider", "Model Version", "Verification Status", "Verification Reason",
+            "Confidence Score",
+        ]
+        ws.append(headers)
+        style_header_row(ws, 1, len(headers))
+        ws.freeze_panes = "A2"
+
+        item_by_uuid = {it.uuid: it for it in items}
+
+        for record in evidence_records:
+            it = item_by_uuid.get(record.item_uuid)
+            author = (it.author or {}).get("username", "") if it else ""
+            if record.start_time is not None:
+                location = f"{record.start_time:.2f}s"
+                if record.end_time is not None:
+                    location += f" - {record.end_time:.2f}s"
+            else:
+                location = "Source text (no media timestamp)"
+            ws.append([
+                str(record.item_uuid),
+                author,
+                record.claim_type,
+                safe_cell_value(record.claim_text),
+                record.evidence_type,
+                safe_cell_value(record.evidence_quote),
+                safe_cell_value(record.source_reference),
+                location,
+                record.analysis_provider,
+                record.model_version,
+                record.verification_status,
+                safe_cell_value(record.verification_reason),
+                record.confidence,
+            ])
+
+        evidenced_jobs = {record.job_id for record in evidence_records}
+        hook_by_job = {hook.job_id: hook for hook in hooks}
+        for job in jobs:
+            if job.id in evidenced_jobs:
+                continue
+            it = item_by_uuid.get(job.item_uuid)
+            author = (it.author or {}).get("username", "") if it else ""
+            legacy_hook = hook_by_job.get(job.id)
+            legacy_quote = (legacy_hook.spoken_hook or {}).get("exact_text", "") if legacy_hook else ""
+            ws.append([
+                str(job.item_uuid), author, "legacy_analysis", "Evidence ledger not available for this pre-Phase-3 analysis",
+                "legacy_unverified", safe_cell_value(legacy_quote), "Persisted legacy analysis job", "Not available", "legacy pipeline", "unknown",
+                "unsupported", "Reprocess this selected item to generate verified evidence records.", "",
+            ])
+
+        exported_rows = len(evidence_records) + sum(1 for job in jobs if job.id not in evidenced_jobs)
+        ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{max(exported_rows + 1, 2)}"
+        for row in ws.iter_rows(min_row=2, max_col=len(headers)):
+            for cell in row:
+                cell.font = DATA_FONT
+                cell.border = CELL_BORDER
+                if isinstance(cell.value, float):
+                    cell.number_format = "0.00"
+
+        auto_fit_columns(ws, max_len=60)
+
 
 
 def export_intelligence_workbook(
@@ -903,7 +1216,7 @@ def export_intelligence_workbook(
     export_dir = paths.data / "exports" / "social_intelligence"
     export_dir.mkdir(parents=True, exist_ok=True)
 
-    date_str = datetime.now(UTC).strftime("%Y-%m-%d_%H%M")
+    date_str = datetime.now(UTC).strftime("%Y-%m-%d_%H%M%S")
     if creator_username:
         filename = f"creator_intelligence_{creator_username}_{date_str}.xlsx"
     else:

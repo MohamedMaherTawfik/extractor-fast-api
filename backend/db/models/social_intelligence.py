@@ -42,6 +42,9 @@ class ContentAnalysisJob(Base, TimestampMixin):
     max_retries: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    quality_summary: Mapped[dict | None] = mapped_column(JSON)
+    completion_summary: Mapped[dict | None] = mapped_column(JSON)
+    resource_usage: Mapped[dict | None] = mapped_column(JSON)
 
     transcript: Mapped[ContentTranscript | None] = relationship(
         back_populates="job", cascade="all, delete-orphan", uselist=False
@@ -57,6 +60,9 @@ class ContentAnalysisJob(Base, TimestampMixin):
     )
     video_analysis: Mapped[ContentVideoAnalysis | None] = relationship(
         back_populates="job", cascade="all, delete-orphan", uselist=False
+    )
+    evidence_records: Mapped[list[AnalysisEvidence]] = relationship(
+        back_populates="job", cascade="all, delete-orphan"
     )
 
 
@@ -75,6 +81,10 @@ class ContentTranscript(Base, TimestampMixin):
     duration_seconds: Mapped[float | None] = mapped_column(Float)
     model_name: Mapped[str] = mapped_column(String(100), nullable=False)
     status: Mapped[str] = mapped_column(String(30), default="completed", nullable=False)
+    raw_text: Mapped[str | None] = mapped_column(Text)
+    corrected_text: Mapped[str | None] = mapped_column(Text)
+    correction_status: Mapped[str] = mapped_column(String(30), default="not_corrected", nullable=False)
+    quality_indicators: Mapped[dict | None] = mapped_column(JSON)
 
     job: Mapped[ContentAnalysisJob] = relationship(back_populates="transcript")
     segments: Mapped[list[ContentTranscriptSegment]] = relationship(
@@ -123,6 +133,8 @@ class ContentHookAnalysis(Base, TimestampMixin):
     qualitative_weaknesses: Mapped[list | None] = mapped_column(JSON)
     recommendations: Mapped[list | None] = mapped_column(JSON)
     model_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    identified_hooks: Mapped[list | None] = mapped_column(JSON)
+    opening_payoff_connection: Mapped[dict | None] = mapped_column(JSON)
 
     job: Mapped[ContentAnalysisJob] = relationship(back_populates="hook_analysis")
 
@@ -200,6 +212,9 @@ class ContentVideoAnalysis(Base, TimestampMixin):
     has_subtitles: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     ending_style: Mapped[str | None] = mapped_column(String(100))
     production_characteristics: Mapped[str | None] = mapped_column(Text)
+    shot_distribution: Mapped[dict | None] = mapped_column(JSON)
+    audio_visual_alignment: Mapped[dict | None] = mapped_column(JSON)
+    visual_analysis_level: Mapped[str | None] = mapped_column(String(50))
 
     job: Mapped[ContentAnalysisJob] = relationship(back_populates="video_analysis")
     scenes: Mapped[list[ContentVideoScene]] = relationship(
@@ -226,8 +241,40 @@ class ContentVideoScene(Base):
     editing_notes: Mapped[str | None] = mapped_column(Text)
     scene_classification: Mapped[str | None] = mapped_column(String(50))
     confidence: Mapped[float | None] = mapped_column(Float)
+    sampled_metrics: Mapped[dict | None] = mapped_column(JSON)
 
     video_analysis: Mapped[ContentVideoAnalysis] = relationship(back_populates="scenes")
+
+
+class AnalysisEvidence(Base, TimestampMixin):
+    """Verification result for one source-derived analytical claim."""
+
+    __tablename__ = "analysis_evidence"
+    __table_args__ = (
+        Index("ix_analysis_evidence_item", "item_uuid"),
+        Index("ix_analysis_evidence_job_status", "job_id", "verification_status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    uuid: Mapped[UUID] = mapped_column(default=uuid4, unique=True, nullable=False)
+    job_id: Mapped[int] = mapped_column(
+        ForeignKey("content_analysis_jobs.id", ondelete="CASCADE"), nullable=False
+    )
+    item_uuid: Mapped[UUID] = mapped_column(nullable=False)
+    claim_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    claim_text: Mapped[str] = mapped_column(Text, nullable=False)
+    evidence_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    source_reference: Mapped[str] = mapped_column(Text, nullable=False)
+    start_time: Mapped[float | None] = mapped_column(Float)
+    end_time: Mapped[float | None] = mapped_column(Float)
+    evidence_quote: Mapped[str | None] = mapped_column(Text)
+    analysis_provider: Mapped[str] = mapped_column(String(120), nullable=False)
+    model_version: Mapped[str] = mapped_column(String(160), nullable=False)
+    verification_status: Mapped[str] = mapped_column(String(30), nullable=False)
+    verification_reason: Mapped[str | None] = mapped_column(Text)
+    confidence: Mapped[float | None] = mapped_column(Float)
+
+    job: Mapped[ContentAnalysisJob] = relationship(back_populates="evidence_records")
 
 
 class CreatorIntelligence(Base, TimestampMixin):
@@ -256,6 +303,12 @@ class CreatorIntelligence(Base, TimestampMixin):
     creator_dna_summary: Mapped[str | None] = mapped_column(Text)
     hypotheses_vs_observed: Mapped[dict | None] = mapped_column(JSON)
     limitations_notice: Mapped[str | None] = mapped_column(Text)
+    topic_distribution: Mapped[dict | None] = mapped_column(JSON)
+    posting_frequency: Mapped[dict | None] = mapped_column(JSON)
+    visual_style_patterns: Mapped[list | None] = mapped_column(JSON)
+    representative_posts: Mapped[list | None] = mapped_column(JSON)
+    sample_post_uuids: Mapped[list | None] = mapped_column(JSON)
+    temporal_trends: Mapped[dict | None] = mapped_column(JSON)
 
 
 class CreativeRecommendation(Base, TimestampMixin):

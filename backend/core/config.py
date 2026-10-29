@@ -172,6 +172,17 @@ class Settings(BaseSettings):
     jev_social_command: str | None = Field(default=None, validation_alias=AliasChoices("JEV_SOCIAL_COMMAND", "EMY_JEV_SOCIAL_COMMAND"))
     jev_social_timeout: float = Field(default=180, gt=0, le=1800, validation_alias=AliasChoices("JEV_SOCIAL_TIMEOUT", "EMY_JEV_SOCIAL_TIMEOUT"))
     run_live_apify_tests: bool = Field(default=False, validation_alias=AliasChoices("RUN_LIVE_APIFY_TESTS", "EMY_RUN_LIVE_APIFY_TESTS"))
+    social_intelligence_max_workers: int = Field(default=2, ge=1, le=8)
+    social_intelligence_batch_limit: int = Field(default=20, ge=1, le=200)
+    social_intelligence_media_budget_seconds: int = Field(default=300, ge=5, le=7200)
+    social_transcription_model: str = "small"
+    social_transcription_device: Literal["cpu", "cuda", "auto"] = "cpu"
+    social_transcription_compute_type: str = "int8"
+    social_semantic_provider: Literal["deterministic_multilingual", "openai_compatible"] = "deterministic_multilingual"
+    semantic_api_base: str | None = None
+    semantic_api_key: str | None = Field(default=None, repr=False)
+    semantic_model: str = ""
+    semantic_request_timeout_seconds: float = Field(default=90.0, gt=0, le=600)
 
     @property
     def database_url(self) -> str:

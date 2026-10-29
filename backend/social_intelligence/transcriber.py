@@ -42,6 +42,7 @@ class TranscriptionResult:
     status: str  # completed, no_audio, failed
     segments: list[TranscriptSegmentData] = field(default_factory=list)
     error_message: str | None = None
+    quality_indicators: dict[str, object] = field(default_factory=dict)
 
 
 def extract_audio(
@@ -157,6 +158,8 @@ class FasterWhisperTranscriber:
                 beam_size=5,
                 vad_filter=True,
                 vad_parameters=dict(min_silence_duration_ms=500),
+                word_timestamps=True,
+                condition_on_previous_text=False,
             )
 
             segments: list[TranscriptSegmentData] = []
@@ -182,6 +185,23 @@ class FasterWhisperTranscriber:
 
             full_text = " ".join(text_parts)
             duration = round(info.duration, 2) if hasattr(info, "duration") and info.duration else None
+            confidences = [s.confidence for s in segments if s.confidence is not None]
+            normalized_phrases = [" ".join(s.text.lower().split()) for s in segments]
+            repeated_phrase_count = len(normalized_phrases) - len(set(normalized_phrases))
+            timestamps_monotonic = all(
+                current.start_time >= previous.start_time and current.end_time >= current.start_time
+                for previous, current in zip(segments, segments[1:])
+            )
+            quality_indicators: dict[str, object] = {
+                "average_segment_confidence": round(sum(confidences) / len(confidences), 3) if confidences else None,
+                "low_confidence_segment_count": sum(1 for value in confidences if value < 0.65),
+                "segment_count": len(segments),
+                "repeated_phrase_count": repeated_phrase_count,
+                "timestamps_monotonic": timestamps_monotonic,
+                "word_timestamps_requested": True,
+                "human_reference_available": False,
+                "wer": None,
+            }
 
             return TranscriptionResult(
                 language=info.language,
@@ -191,6 +211,7 @@ class FasterWhisperTranscriber:
                 model_name=f"faster-whisper-{self.model_size}",
                 status="completed" if full_text else "no_speech_detected",
                 segments=segments,
+                quality_indicators=quality_indicators,
             )
         except Exception as exc:
             logger.error("FasterWhisper transcription failed: %s", exc)

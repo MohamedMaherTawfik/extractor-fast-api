@@ -47,6 +47,18 @@ run_live_overture_tests: false
 run_live_osm_tests: false
 run_live_google_places_tests: false
 run_live_foursquare_tests: false
+social_intelligence_max_workers: 2
+social_intelligence_batch_limit: 20
+social_intelligence_media_budget_seconds: 300
+# Selected from the authorized Arabic sample benchmark; override via environment when needed.
+social_transcription_model: small
+social_transcription_device: cpu
+social_transcription_compute_type: int8
+# Deterministic mode is explicitly heuristic. Set an approved endpoint to enable real LLM calls.
+social_semantic_provider: deterministic_multilingual
+semantic_api_base: null
+semantic_model: ""
+semantic_request_timeout_seconds: 90
 creator_import_column_mapping:
   Name: display_name
   Creator: display_name

@@ -9,7 +9,7 @@ from backend.core.paths import paths
 
 
 INITIAL_REVISION = "0001_core"
-CURRENT_SCHEMA_REVISION = "0014_social_content_intelligence"
+CURRENT_SCHEMA_REVISION = "0016_verified_ai_evidence"
 
 
 def get_alembic_config(database_url: str | None = None) -> Config:

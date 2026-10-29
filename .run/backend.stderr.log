@@ -1,4 +1,6 @@
-INFO:     Started server process [33860]
+INFO:     Started server process [40056]
 INFO:     Waiting for application startup.
 INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
 INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+C:\Emy the project\.venv\Lib\site-packages\openpyxl\workbook\child.py:99: UserWarning: Title is more than 31 characters. Some applications may not be able to read the file
+  warnings.warn("Title is more than 31 characters. Some applications may not be able to read the file")

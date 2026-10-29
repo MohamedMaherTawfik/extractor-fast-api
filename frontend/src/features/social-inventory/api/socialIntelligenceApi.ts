@@ -31,6 +31,23 @@ export const socialIntelligenceApi = {
   retry: (jobUuid: string) =>
     api<AnalysisJob>(`${root}/jobs/${jobUuid}/retry`, { method: "POST" }),
 
+  cancel: (jobUuid: string) =>
+    api<{ job_uuid: string; cancelled: boolean }>(`${root}/jobs/${jobUuid}/cancel`, {
+      method: "POST",
+    }),
+
+  capabilities: () =>
+    api<{ status: string; system: any; ml_engines: any; limits: any }>(`${root}/capabilities`),
+
+  search: (criteria: Record<string, unknown>) =>
+    api<{ total: number; results: any[] }>(`${root}/search`, {
+      method: "POST",
+      body: JSON.stringify(criteria),
+    }),
+
+  compareCreators: (usernames: string, platform = "instagram") =>
+    api<any>(`${root}/creators/compare?usernames=${encodeURIComponent(usernames)}&platform=${platform}`),
+
   analysis: (itemUuid: string) =>
     api<CompleteAnalysis>(`${root}/items/${itemUuid}`),
 

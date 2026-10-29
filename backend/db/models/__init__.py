@@ -87,7 +87,7 @@ from backend.db.models.social_inventory import (
     SocialInventoryRun, SocialInventorySource,
 )
 from backend.db.models.social_intelligence import (
-    ContentAnalysisJob, ContentCopyAnalysis, ContentHookAnalysis,
+    AnalysisEvidence, ContentAnalysisJob, ContentCopyAnalysis, ContentHookAnalysis,
     ContentNarrativeAnalysis, ContentTranscript, ContentTranscriptSegment,
     ContentVideoAnalysis, ContentVideoScene, CreatorIntelligence,
     CreativeRecommendation, ExcelExportJob,
@@ -180,6 +180,7 @@ __all__ = [
     "ContentHookAnalysis", "ContentCopyAnalysis", "ContentNarrativeAnalysis",
     "ContentVideoAnalysis", "ContentVideoScene", "CreatorIntelligence",
     "CreativeRecommendation", "ExcelExportJob",
+    "AnalysisEvidence",
 ]
 from backend.db.models.analysis import (
     AnalysisResult,

@@ -175,6 +175,7 @@ def test_database_migrations_upgrade_and_downgrade(tmp_path) -> None:
         "creator_intelligence",
         "creative_recommendations",
         "excel_export_jobs",
+            "analysis_evidence",
     }
     assert revision == CURRENT_SCHEMA_REVISION
     assert expected_tables == set(inspect(engine).get_table_names())

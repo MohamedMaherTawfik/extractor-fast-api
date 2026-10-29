@@ -11,7 +11,10 @@ import {
   MessageSquare,
   Play,
   RefreshCw,
+  Search,
   Sparkles,
+  Target,
+  XCircle,
 } from "lucide-react";
 import { LoadingState } from "../../../components/States";
 import { StatusBadge } from "../../../components/StatusBadge";
@@ -31,6 +34,8 @@ export function ContentAnalysisView({
     "overview" | "hooks" | "transcript" | "copy" | "story" | "video" | "creative"
   >("overview");
   const [genType, setGenType] = useState("hook_variations");
+  const [customTopic, setCustomTopic] = useState("");
+  const [transcriptSearch, setTranscriptSearch] = useState("");
   const [copiedId, setCopiedId] = useState<string>();
 
   const analysisQuery = useQuery({
@@ -52,13 +57,18 @@ export function ContentAnalysisView({
     onSuccess: () => cache.invalidateQueries({ queryKey: ["social-intel", item.uuid] }),
   });
 
+  const cancelMutation = useMutation({
+    mutationFn: (jobUuid: string) => client.cancel(jobUuid),
+    onSuccess: () => cache.invalidateQueries({ queryKey: ["social-intel", item.uuid] }),
+  });
+
   const generateMutation = useMutation({
     mutationFn: () =>
       client.generateCreative({
         item_uuid: item.uuid,
         creator_username: (item.author as Record<string, string>)?.username,
         output_type: genType,
-        topic_context: item.title || item.caption?.slice(0, 50),
+        topic_context: customTopic || item.title || item.caption?.slice(0, 60),
       }),
     onSuccess: () =>
       cache.invalidateQueries({ queryKey: ["social-intel-creative", item.uuid] }),
@@ -79,6 +89,11 @@ export function ContentAnalysisView({
     setTimeout(() => setCopiedId(undefined), 2000);
   };
 
+  // Filter transcript segments
+  const filteredSegments = (analysis?.transcript?.segments || []).filter((seg) =>
+    transcriptSearch ? seg.text.toLowerCase().includes(transcriptSearch.toLowerCase()) : true
+  );
+
   return (
     <div className="content-analysis-view">
       <div className="analysis-header-bar">
@@ -92,7 +107,19 @@ export function ContentAnalysisView({
           )}
         </div>
         <div className="action-row">
-          {(!job || job.status === "FAILED" || job.status === "PARTIAL") && (
+          {isRunning && job?.uuid && (
+            <button
+              className="button danger small"
+              disabled={cancelMutation.isPending}
+              onClick={() => cancelMutation.mutate(job.uuid)}
+              title="Stop ongoing background processing"
+            >
+              <XCircle size={13} />
+              Cancel
+            </button>
+          )}
+
+          {(!job || job.status === "FAILED" || job.status === "PARTIAL" || job.status === "CANCELLED") && (
             <button
               className="button primary small"
               disabled={analyzeMutation.isPending || isRunning}
@@ -104,11 +131,12 @@ export function ContentAnalysisView({
               {job?.status === "FAILED" ? "Retry Analysis" : "Run AI Analysis"}
             </button>
           )}
+
           <a
             className="button secondary small"
             href={client.streamExportUrl({ scope: "single" })}
             download
-            title="Export 14-Sheet Excel Workbook"
+            title="Export 18-Sheet Comprehensive Excel Workbook"
           >
             <Download size={13} />
             Export XLSX
@@ -198,6 +226,9 @@ export function ContentAnalysisView({
                         </span>
                       ))}
                     </div>
+                    <p className="alignment-note">
+                      <strong>Text/Visual Alignment:</strong> {analysis.hooks.text_visual_alignment}
+                    </p>
                   </div>
                 )}
               </div>
@@ -208,56 +239,145 @@ export function ContentAnalysisView({
               <div className="hooks-pane">
                 {analysis?.hooks ? (
                   <>
-                    <div className="card-section spoken-hook-box">
-                      <div className="badge-row">
-                        <span className="badge-pill">Spoken Hook</span>
-                        <span className="time-badge">
-                          {analysis.hooks.spoken_hook?.start_time}s -{" "}
-                          {analysis.hooks.spoken_hook?.end_time}s (
-                          {analysis.hooks.spoken_hook?.duration}s)
-                        </span>
-                      </div>
-                      <p className="hook-quote" dir="auto">
-                        "{analysis.hooks.spoken_hook?.exact_text || "No spoken audio detected"}"
-                      </p>
-                      <div className="meta-sub">
-                        <span>Strategy: {analysis.hooks.spoken_hook?.opening_strategy}</span>
-                        <span>Trigger: {analysis.hooks.spoken_hook?.key_attention_trigger}</span>
-                      </div>
-                    </div>
+                    {/* Render Multi-Hooks if available */}
+                    {analysis.hooks.identified_hooks && analysis.hooks.identified_hooks.length > 0 ? (
+                      <div className="multi-hooks-grid">
+                        {analysis.hooks.identified_hooks.map((hook, idx) => (
+                          <div key={idx} className="card-section hook-card-entry">
+                            <div className="badge-row">
+                              <span className="badge-pill modality-badge">{hook.modality.toUpperCase()} HOOK</span>
+                              <span className="pill category-pill">{hook.category.replace("_", " ")}</span>
+                              {hook.start_time !== undefined && hook.end_time !== undefined && (
+                                <span className="time-badge">
+                                  {hook.start_time}s - {hook.end_time}s ({hook.duration}s)
+                                </span>
+                              )}
+                              <span className="conf-score">{(hook.confidence * 100).toFixed(0)}% conf</span>
+                            </div>
 
-                    <div className="card-section visual-hook-box">
-                      <div className="badge-row">
-                        <span className="badge-pill">Visual Hook</span>
-                      </div>
-                      <div className="meta-pairs">
-                        <div>
-                          <label>Composition</label>
-                          <span>{analysis.hooks.visual_hook?.first_frame_composition}</span>
-                        </div>
-                        <div>
-                          <label>Opening Event</label>
-                          <span>{analysis.hooks.visual_hook?.opening_visual_event}</span>
-                        </div>
-                        <div>
-                          <label>Contrast</label>
-                          <span>{analysis.hooks.visual_hook?.visual_contrast}</span>
-                        </div>
-                      </div>
-                    </div>
+                            {hook.exact_text && (
+                              <p className="hook-quote" dir="auto">
+                                "{hook.exact_text}"
+                              </p>
+                            )}
 
-                    <div className="card-section text-hook-box">
-                      <div className="badge-row">
-                        <span className="badge-pill">Caption Hook</span>
-                      </div>
-                      <p dir="auto">
-                        {analysis.hooks.text_hook?.opening_caption_sentence}
-                      </p>
-                    </div>
+                            <div className="meta-sub">
+                              <span><strong>Mechanism:</strong> {hook.mechanism}</span>
+                              <span><strong>Attention Strategy:</strong> {hook.attention_strategy}</span>
+                              <span><strong>Curiosity Gap:</strong> {hook.promise_or_curiosity_gap}</span>
+                            </div>
 
+                            <p className="explanation-text">{hook.explanation}</p>
+
+                            {hook.subjective_assessment && (
+                              <div className="subjective-box">
+                                <small className="subjective-label">CREATIVE ASSESSMENT (SUBJECTIVE)</small>
+                                <p>{hook.subjective_assessment}</p>
+                              </div>
+                            )}
+
+                            {hook.suggested_alternatives && hook.suggested_alternatives.length > 0 && (
+                              <div className="alt-hooks-section">
+                                <label><Lightbulb size={13} /> Suggested Original Alternatives:</label>
+                                <ul>
+                                  {hook.suggested_alternatives.map((alt, aIdx) => (
+                                    <li key={aIdx} dir="auto">
+                                      <span>{alt}</span>
+                                      <button
+                                        className="icon-button mini"
+                                        onClick={() => copyText(alt, `alt-${idx}-${aIdx}`)}
+                                        title="Copy suggested hook"
+                                      >
+                                        {copiedId === `alt-${idx}-${aIdx}` ? (
+                                          <CheckCircle2 size={12} color="#22c55e" />
+                                        ) : (
+                                          <Copy size={12} />
+                                        )}
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      /* Fallback to legacy single hook view */
+                      <>
+                        {analysis.hooks.spoken_hook && (
+                          <div className="card-section spoken-hook-box">
+                            <div className="badge-row">
+                              <span className="badge-pill">Spoken Hook</span>
+                              <span className="time-badge">
+                                {analysis.hooks.spoken_hook.start_time}s - {analysis.hooks.spoken_hook.end_time}s
+                              </span>
+                            </div>
+                            <p className="hook-quote" dir="auto">
+                              "{analysis.hooks.spoken_hook.exact_text}"
+                            </p>
+                            <div className="meta-sub">
+                              <span>Strategy: {analysis.hooks.spoken_hook.opening_strategy}</span>
+                              <span>Trigger: {analysis.hooks.spoken_hook.key_attention_trigger}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {analysis.hooks.visual_hook && (
+                          <div className="card-section visual-hook-box">
+                            <div className="badge-row">
+                              <span className="badge-pill">Visual Hook</span>
+                            </div>
+                            <div className="meta-pairs">
+                              <div>
+                                <label>Composition</label>
+                                <span>{analysis.hooks.visual_hook.first_frame_composition}</span>
+                              </div>
+                              <div>
+                                <label>Opening Event</label>
+                                <span>{analysis.hooks.visual_hook.opening_visual_event}</span>
+                              </div>
+                              <div>
+                                <label>Contrast</label>
+                                <span>{analysis.hooks.visual_hook.visual_contrast}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {analysis.hooks.text_hook && (
+                          <div className="card-section text-hook-box">
+                            <div className="badge-row">
+                              <span className="badge-pill">Caption Hook</span>
+                            </div>
+                            <p dir="auto">
+                              {analysis.hooks.text_hook.opening_caption_sentence}
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {/* Opening-to-Payoff Connection Card */}
+                    {analysis.hooks.opening_payoff_connection?.has_payoff && (
+                      <div className="card-section payoff-card">
+                        <div className="badge-row">
+                          <span className="badge-pill success"><Target size={13} /> Hook-to-Payoff Connection</span>
+                          <span className="time-badge">Payoff at {analysis.hooks.opening_payoff_connection.payoff_timestamp}s</span>
+                        </div>
+                        <p className="payoff-reasoning">{analysis.hooks.opening_payoff_connection.reasoning}</p>
+                        {analysis.hooks.opening_payoff_connection.payoff_quote && (
+                          <p className="payoff-quote" dir="auto">
+                            "{analysis.hooks.opening_payoff_connection.payoff_quote}"
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Qualitative Strengths and Recommendations */}
                     <div className="card-section qualitative-grid">
                       <div>
-                        <h4>Strengths</h4>
+                        <h4>Evidence-Based Strengths</h4>
                         <ul>
                           {analysis.hooks.qualitative_strengths?.map((s, idx) => (
                             <li key={idx}>{s}</li>
@@ -265,7 +385,7 @@ export function ContentAnalysisView({
                         </ul>
                       </div>
                       <div>
-                        <h4>Recommendations</h4>
+                        <h4>Strategic Recommendations</h4>
                         <ul>
                           {analysis.hooks.recommendations?.map((r, idx) => (
                             <li key={idx}>{r}</li>
@@ -277,7 +397,7 @@ export function ContentAnalysisView({
                 ) : (
                   <p className="empty-notice">
                     {isRunning
-                      ? "Analyzing hooks..."
+                      ? "Extracting evidence-backed hooks..."
                       : "No hook analysis available. Click 'Run AI Analysis' above."}
                   </p>
                 )}
@@ -290,12 +410,25 @@ export function ContentAnalysisView({
                 {analysis?.transcript ? (
                   <>
                     <div className="transcript-header-info">
-                      <span>Detected Language: {analysis.transcript.language?.toUpperCase()}</span>
+                      <span>Language: {analysis.transcript.language?.toUpperCase() || "AR"}</span>
                       <span>Model: {analysis.transcript.model_name}</span>
                       <span>Duration: {analysis.transcript.duration_seconds}s</span>
+                      <span>Source: Raw ASR ({analysis.transcript.correction_status || "not_corrected"})</span>
+                      {analysis.transcript.quality_indicators?.average_segment_confidence !== undefined && (
+                        <span>Avg confidence: {(analysis.transcript.quality_indicators.average_segment_confidence * 100).toFixed(0)}%</span>
+                      )}
+                      <div className="transcript-search-box">
+                        <Search size={13} />
+                        <input
+                          type="text"
+                          placeholder="Search in transcript..."
+                          value={transcriptSearch}
+                          onChange={(e) => setTranscriptSearch(e.target.value)}
+                        />
+                      </div>
                     </div>
                     <div className="segment-list" dir="auto">
-                      {analysis.transcript.segments?.map((seg) => (
+                      {filteredSegments.map((seg) => (
                         <div key={seg.segment_index} className="segment-row">
                           <span className="time-code">
                             {seg.start_time.toFixed(1)}s - {seg.end_time.toFixed(1)}s
@@ -306,6 +439,17 @@ export function ContentAnalysisView({
                               {(seg.confidence * 100).toFixed(0)}%
                             </span>
                           )}
+                          <button
+                            className="icon-button mini"
+                            onClick={() => copyText(seg.text, `seg-${seg.segment_index}`)}
+                            title="Copy segment text"
+                          >
+                            {copiedId === `seg-${seg.segment_index}` ? (
+                              <CheckCircle2 size={12} color="#22c55e" />
+                            ) : (
+                              <Copy size={12} />
+                            )}
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -313,8 +457,8 @@ export function ContentAnalysisView({
                 ) : (
                   <p className="empty-notice">
                     {isRunning
-                      ? "Transcribing audio..."
-                      : "No transcript available. Ensure media URL is accessible and click 'Run AI Analysis'."}
+                      ? "Transcribing audio via faster-whisper..."
+                      : "No transcript available. Media may be expired or inaccessible."}
                   </p>
                 )}
               </div>
@@ -325,7 +469,7 @@ export function ContentAnalysisView({
               <div className="copy-pane">
                 {analysis?.copy ? (
                   <div className="card-section">
-                    <h3>Copywriting & Strategic Intent</h3>
+                    <h3>Copywriting & Linguistic Strategy</h3>
                     <div className="meta-pairs">
                       <div>
                         <label>Main Topic</label>
@@ -333,7 +477,7 @@ export function ContentAnalysisView({
                       </div>
                       <div>
                         <label>Writing Style / Dialect</label>
-                        <span>{analysis.copy.writing_style}</span>
+                        <span className="pill">{analysis.copy.writing_style}</span>
                       </div>
                       <div>
                         <label>Tone of Voice</label>
@@ -344,22 +488,34 @@ export function ContentAnalysisView({
                         <span>{analysis.copy.emotional_framing}</span>
                       </div>
                       <div>
-                        <label>CTA Type</label>
+                        <label>Detected CTA Type</label>
                         <span className="pill">{analysis.copy.cta_type}</span>
                       </div>
                       <div>
-                        <label>Exact CTA Text</label>
-                        <span dir="auto">{analysis.copy.cta_text || "None"}</span>
+                        <label>Matched CTA Directive</label>
+                        <span dir="auto">{analysis.copy.cta_text || "None / Implicit"}</span>
                       </div>
                     </div>
+
+                    {analysis.copy.persuasion_techniques && (
+                      <div className="persuasion-box">
+                        <label>Observed Persuasion Techniques</label>
+                        <ul>
+                          {analysis.copy.persuasion_techniques.map((tech, i) => (
+                            <li key={i}>{tech}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
                     <div className="summary-box">
-                      <label>AI Strategic Summary</label>
+                      <label>AI Strategic Synthesis</label>
                       <p>{analysis.copy.summary}</p>
                     </div>
                   </div>
                 ) : (
                   <p className="empty-notice">
-                    {isRunning ? "Analyzing copywriting..." : "No copy analysis available."}
+                    {isRunning ? "Analyzing copywriting semantics..." : "No copy analysis available."}
                   </p>
                 )}
               </div>
@@ -371,7 +527,7 @@ export function ContentAnalysisView({
                 {analysis?.storytelling ? (
                   <div className="card-section">
                     <div className="badge-row">
-                      <h3>Narrative Architecture</h3>
+                      <h3>Narrative Progression</h3>
                       <span className="pill">
                         {analysis.storytelling.narrative_pattern.replace("_", " ")}
                       </span>
@@ -386,7 +542,7 @@ export function ContentAnalysisView({
                           <h4>{stage.stage_name}</h4>
                           <p>{stage.description}</p>
                           <small className="muted" dir="auto">
-                            Evidence: {stage.evidence}
+                            Verbatim Quote: "{stage.evidence}"
                           </small>
                         </div>
                       ))}
@@ -394,7 +550,7 @@ export function ContentAnalysisView({
                   </div>
                 ) : (
                   <p className="empty-notice">
-                    {isRunning ? "Analyzing narrative stages..." : "No storytelling analysis available."}
+                    {isRunning ? "Deconstructing narrative progression..." : "No storytelling analysis available."}
                   </p>
                 )}
               </div>
@@ -405,7 +561,7 @@ export function ContentAnalysisView({
               <div className="video-pane">
                 {analysis?.video ? (
                   <div className="card-section">
-                    <h3>Visual Deconstruction & Production</h3>
+                    <h3>Visual Deconstruction & Temporal Analysis</h3>
                     <div className="meta-pairs">
                       <div>
                         <label>Aspect Ratio</label>
@@ -423,10 +579,18 @@ export function ContentAnalysisView({
                         <label>Avg Shot Duration</label>
                         <span>{analysis.video.avg_scene_duration}s</span>
                       </div>
+                      <div>
+                        <label>Analysis Level</label>
+                        <span className="pill">{analysis.video.visual_analysis_level || "sampled_frames"}</span>
+                      </div>
+                      <div>
+                        <label>Subtitles Present</label>
+                        <span>{analysis.video.has_subtitles ? "Detected" : "None Detected"}</span>
+                      </div>
                     </div>
 
                     <div className="scenes-list">
-                      <h4>Detected Scenes & Shots</h4>
+                      <h4>Verified Scene Timeline</h4>
                       {analysis.video.scenes?.map((scene) => (
                         <div key={scene.scene_index} className="scene-item">
                           <span className="scene-num">#{scene.scene_index}</span>
@@ -435,13 +599,16 @@ export function ContentAnalysisView({
                           </span>
                           <span className="scene-desc">{scene.visual_description}</span>
                           <span className="scene-tag">{scene.camera_framing}</span>
+                          {scene.scene_classification && (
+                            <span className="scene-tag muted">{scene.scene_classification}</span>
+                          )}
                         </div>
                       ))}
                     </div>
                   </div>
                 ) : (
                   <p className="empty-notice">
-                    {isRunning ? "Deconstructing video..." : "No video deconstruction available."}
+                    {isRunning ? "Sampling frames and deconstructing video..." : "No video analysis available."}
                   </p>
                 )}
               </div>
@@ -451,24 +618,33 @@ export function ContentAnalysisView({
             {activeTab === "creative" && (
               <div className="creative-pane">
                 <div className="card-section generator-controls">
-                  <h3>AI Creative Variations</h3>
+                  <h3>AI Creative Variations Generator</h3>
                   <div className="control-bar">
                     <select
                       value={genType}
                       onChange={(e) => setGenType(e.target.value)}
                     >
-                      <option value="hook_variations">Hook Variations (3 Styles)</option>
+                      <option value="hook_variations">Hook Variations (3 Distinct Angles)</option>
                       <option value="video_script">Original Video Script Outline</option>
                       <option value="caption_variations">Caption Variations</option>
                       <option value="cta_ideas">Conversion CTA Ideas</option>
                     </select>
+
+                    <input
+                      type="text"
+                      className="topic-input"
+                      placeholder="Custom topic context (optional)..."
+                      value={customTopic}
+                      onChange={(e) => setCustomTopic(e.target.value)}
+                    />
+
                     <button
                       className="button primary"
                       disabled={generateMutation.isPending}
                       onClick={() => generateMutation.mutate()}
                     >
                       <Sparkles size={14} />
-                      {generateMutation.isPending ? "Generating..." : "Generate New Creative"}
+                      {generateMutation.isPending ? "Generating..." : "Generate AI Creative"}
                     </button>
                   </div>
                 </div>
@@ -487,6 +663,7 @@ export function ContentAnalysisView({
                               rec.uuid
                             )
                           }
+                          title="Copy generated idea"
                         >
                           {copiedId === rec.uuid ? (
                             <CheckCircle2 size={13} color="#22c55e" />
@@ -518,7 +695,7 @@ export function ContentAnalysisView({
                       )}
 
                       <div className="rationale-content">
-                        <label>Creative Rationale</label>
+                        <label>Creative Strategy Rationale</label>
                         <p>{rec.creative_rationale}</p>
                       </div>
                     </div>

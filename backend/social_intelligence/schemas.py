@@ -25,11 +25,17 @@ class AnalysisJobResponse(BaseModel):
     started_at: datetime | None = None
     completed_at: datetime | None = None
     created_at: datetime | None = None
+    quality_summary: dict[str, Any] | None = None
+    completion_summary: dict[str, Any] | None = None
+    resource_usage: dict[str, Any] | None = None
 
 
 class BatchAnalysisRequest(BaseModel):
     item_uuids: list[UUID]
     force_reprocess: bool = False
+    transcription_model: str | None = None
+    semantic_model: str | None = None
+    media_budget_seconds: int | None = Field(default=None, ge=5, le=7200)
 
 
 class TranscriptSegmentResponse(BaseModel):
@@ -53,6 +59,29 @@ class TranscriptResponse(BaseModel):
     model_name: str
     status: str
     segments: list[TranscriptSegmentResponse] = []
+    raw_text: str | None = None
+    corrected_text: str | None = None
+    correction_status: str = "not_corrected"
+    quality_indicators: dict[str, Any] | None = None
+
+
+class AnalysisEvidenceResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    uuid: UUID
+    item_uuid: UUID
+    claim_type: str
+    claim_text: str
+    evidence_type: str
+    source_reference: str
+    start_time: float | None = None
+    end_time: float | None = None
+    evidence_quote: str | None = None
+    analysis_provider: str
+    model_version: str
+    verification_status: str
+    verification_reason: str | None = None
+    confidence: float | None = None
 
 
 class HookAnalysisResponse(BaseModel):
@@ -72,6 +101,8 @@ class HookAnalysisResponse(BaseModel):
     qualitative_weaknesses: list[str] | None = None
     recommendations: list[str] | None = None
     model_name: str
+    identified_hooks: list[dict[str, Any]] | None = None
+    opening_payoff_connection: dict[str, Any] | None = None
 
 
 class CopyAnalysisResponse(BaseModel):
@@ -130,6 +161,7 @@ class VideoSceneResponse(BaseModel):
     editing_notes: str | None = None
     scene_classification: str | None = None
     confidence: float | None = None
+    sampled_metrics: dict[str, Any] | None = None
 
 
 class VideoAnalysisResponse(BaseModel):
@@ -150,6 +182,9 @@ class VideoAnalysisResponse(BaseModel):
     has_subtitles: bool = False
     ending_style: str | None = None
     production_characteristics: str | None = None
+    shot_distribution: dict[str, Any] | None = None
+    audio_visual_alignment: dict[str, Any] | None = None
+    visual_analysis_level: str | None = None
     scenes: list[VideoSceneResponse] = []
 
 
@@ -163,13 +198,14 @@ class CompleteContentAnalysisResponse(BaseModel):
     copy_analysis: CopyAnalysisResponse | None = Field(default=None, alias="copy", serialization_alias="copy")
     storytelling: NarrativeAnalysisResponse | None = None
     video: VideoAnalysisResponse | None = None
+    evidence: list[AnalysisEvidenceResponse] = []
 
 
 class CreatorIntelligenceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    platform: str
-    creator_id: str
+    platform: str = "instagram"
+    creator_id: str | None = None
     username: str
     display_name: str | None = None
     sample_size: int
@@ -186,6 +222,12 @@ class CreatorIntelligenceResponse(BaseModel):
     creator_dna_summary: str | None = None
     hypotheses_vs_observed: dict[str, Any] | None = None
     limitations_notice: str | None = None
+    topic_distribution: dict[str, Any] | None = None
+    posting_frequency: dict[str, Any] | None = None
+    visual_style_patterns: list[str] | None = None
+    representative_posts: list[dict[str, Any]] | None = None
+    sample_post_uuids: list[str] | None = None
+    temporal_trends: dict[str, Any] | None = None
 
 
 class CreativeGenerateRequest(BaseModel):
@@ -240,3 +282,46 @@ class ExcelExportJobResponse(BaseModel):
     file_size_bytes: int = 0
     created_at: datetime
     completed_at: datetime | None = None
+
+
+class ContentSearchRequest(BaseModel):
+    hook_category: str | None = None
+    storytelling_structure: str | None = None
+    topic: str | None = None
+    has_talking_head: bool | None = None
+    has_broll: bool | None = None
+    transcript_phrase: str | None = None
+    creator_username: str | None = None
+    platform: str | None = None
+    date_from: datetime | None = None
+    date_to: datetime | None = None
+    min_duration: float | None = None
+    max_duration: float | None = None
+    limit: int = Field(default=50, ge=1, le=200)
+    offset: int = Field(default=0, ge=0)
+
+
+class ContentSearchResultItem(BaseModel):
+    item_uuid: UUID
+    platform: str
+    author_username: str | None = None
+    title: str | None = None
+    caption_snippet: str | None = None
+    published_at: datetime | None = None
+    analysis_status: str
+    duration_seconds: float | None = None
+    matched_hook_category: str | None = None
+    matched_storytelling_pattern: str | None = None
+    matched_topic: str | None = None
+    evidence_snippet: str | None = None
+
+
+class ContentSearchResponse(BaseModel):
+    total: int
+    results: list[ContentSearchResultItem]
+
+
+class CreatorComparisonResponse(BaseModel):
+    platform: str
+    creators: list[CreatorIntelligenceResponse]
+    comparison_matrix: dict[str, Any]

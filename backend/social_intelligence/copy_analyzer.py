@@ -7,20 +7,13 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-logger = logging.getLogger(__name__)
+from backend.social_intelligence.semantic_provider import (
+    CTA_PATTERNS,
+    StructuredCopyAnalysis,
+    get_semantic_provider,
+)
 
-# Common CTA phrases in Arabic and English
-CTA_PATTERNS = [
-    (r"(?:رابط|اللينك)\s*(?:الحلقة|الفيديو|الموقع)?\s*(?:في|بال|ف|فى)\s*(?:البايو|الـ\s*bio|bio)", "link_in_bio"),
-    (r"(?:قولنا|شاركنا|اكتب|سيب)\s*(?:رأيك|في\s*التعليقات|كومنت)", "comment"),
-    (r"(?:شير|شارك|ابعت)\s*(?:الفيديو|البوست|لصحابك)", "share"),
-    (r"(?:احفظ|سيف)\s*(?:البوست|الفيديو|المعلومة)", "save"),
-    (r"(?:تابع|فولو|اشترك)", "follow"),
-    (r"(?:link in bio|link in comments|check bio)", "link_in_bio"),
-    (r"(?:comment below|leave a comment|tell us)", "comment"),
-    (r"(?:share this|repost)", "share"),
-    (r"(?:save for later|save this post)", "save"),
-]
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -45,6 +38,7 @@ class CopyAnalysisResult:
     readability_observations: str
     brand_voice_indicators: str
     summary: str
+    evidence_citations: list[dict[str, Any]] = field(default_factory=list)
 
 
 def extract_hashtags(text: str | None) -> list[str]:
@@ -69,88 +63,39 @@ def detect_cta(caption: str | None) -> tuple[str, str | None, bool]:
     return "none", None, False
 
 
-def analyze_caption(caption: str | None, author_name: str | None = None) -> CopyAnalysisResult:
-    """Analyze copywriting characteristics, persuasion techniques, and Arabic dialect."""
-    raw_caption = caption or ""
-    trimmed = raw_caption.strip()
-
-    # Opening sentence
-    sentences = [s.strip() for s in re.split(r"[\n.!?؟]+", trimmed) if s.strip()]
-    opening_sentence = sentences[0] if sentences else None
-
-    # Detect CTA
-    cta_type, cta_text, is_explicit = detect_cta(trimmed)
-
-    # Hashtags
-    hashtags = extract_hashtags(trimmed)
-    branded_tags = [tag for tag in hashtags if tag in {"الدحيح", "eldaheeh", "AJplus"}]
-    topic_tags = [tag for tag in hashtags if tag not in branded_tags]
-
-    hashtag_strat = {
-        "total_count": len(hashtags),
-        "branded_hashtags": branded_tags,
-        "topic_hashtags": topic_tags,
-        "strategy_type": "Minimalist Branded" if len(hashtags) <= 2 else "Broad Discovery",
-    }
-
-    # Arabic dialect markers
-    is_egyptian = bool(re.search(r"\b(دلوقتي|عشان|كده|إزاي|ليه|فين|بتاع|يا جماعة)\b", trimmed))
-    writing_style = "Conversational Egyptian Dialect (عامية مصرية)" if is_egyptian else "Modern Standard Arabic (فصحى معاصرة)"
-
-    # Identify primary message and topic
-    main_topic = "Science & Biography" if any(k in trimmed for k in ["أحمد زويل", "علم", "السيف", "تاريخ"]) else "Educational Edutainment"
-    primary_message = opening_sentence or (f"New content feature by {author_name or 'creator'}")
-    secondary_topics = ["Scientific Discovery", "Historical Biography", "Public Edutainment"]
-
-    tone = "Informative, engaging, and direct"
-    emotional_framing = "Curiosity and intellectual intrigue"
-    persuasion = [
-        "Brand recognition anchor (#الدحيح)",
-        "Call to continuous exploration (watch full episode)",
-        "Authority endorsement (referencing iconic Nobel laureate / historic topics)",
-    ]
-    objective = "Cross-platform traffic conversion (driving reel viewers to full YouTube episode)"
-    audience_address = "Direct / collective community announcement"
-
-    structure_desc = (
-        f"{len(sentences)} distinct textual blocks: "
-        f"Block 1: Hook and announcement ('{opening_sentence or ''}'). "
-        f"Block 2: Platform destination call-to-action ('{cta_text or ''}')."
-    )
-
-    readability = (
-        "Concise, high-legibility social copy designed for rapid mobile skimming without clutter."
-    )
-
-    brand_voice = (
-        f"Signature edutainment style of {author_name or 'the creator'}: informal, accessible, and community-centric."
-    )
-
-    summary = (
-        f"The post uses a streamlined two-part copywriting model: an immediate topic hook followed by "
-        f"a clear {cta_type.replace('_', ' ')} directive ('{cta_text or ''}'). "
-        f"Framed in accessible {writing_style} with high branded resonance."
+def analyze_caption(
+    caption: str | None,
+    author_name: str | None = None,
+    username: str | None = None,
+) -> CopyAnalysisResult:
+    """Analyze copywriting characteristics, persuasion techniques, and Arabic dialect using the semantic provider."""
+    provider = get_semantic_provider()
+    analysis: StructuredCopyAnalysis = provider.analyze_copy(
+        caption=caption,
+        author_name=author_name,
+        username=username,
     )
 
     return CopyAnalysisResult(
-        original_caption=raw_caption,
-        opening_sentence=opening_sentence,
-        primary_message=primary_message,
-        main_topic=main_topic,
-        secondary_topics=secondary_topics,
-        tone_of_voice=tone,
-        writing_style=writing_style,
-        emotional_framing=emotional_framing,
-        persuasion_techniques=persuasion,
-        content_objective=objective,
-        audience_address=audience_address,
-        hashtag_strategy=hashtag_strat,
-        cta_type=cta_type,
-        cta_text=cta_text,
-        is_explicit_cta=is_explicit,
-        caption_structure=structure_desc,
-        sentence_characteristics="Short compound declarative sentences with high action verbs",
-        readability_observations=readability,
-        brand_voice_indicators=brand_voice,
-        summary=summary,
+        original_caption=analysis.original_caption,
+        opening_sentence=analysis.opening_sentence,
+        primary_message=analysis.primary_message,
+        main_topic=analysis.main_topic,
+        secondary_topics=analysis.secondary_topics,
+        tone_of_voice=analysis.tone_of_voice,
+        writing_style=analysis.writing_style,
+        emotional_framing=analysis.emotional_framing,
+        persuasion_techniques=analysis.persuasion_techniques,
+        content_objective=analysis.content_objective,
+        audience_address=analysis.audience_address,
+        hashtag_strategy=analysis.hashtag_strategy,
+        cta_type=analysis.cta_type,
+        cta_text=analysis.cta_text,
+        is_explicit_cta=analysis.is_explicit_cta,
+        caption_structure=analysis.caption_structure,
+        sentence_characteristics=analysis.sentence_characteristics,
+        readability_observations=analysis.readability_observations,
+        brand_voice_indicators=analysis.brand_voice_indicators,
+        summary=analysis.summary,
+        evidence_citations=[c.model_dump() for c in analysis.evidence_citations],
     )

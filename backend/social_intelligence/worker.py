@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import traceback
+import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -16,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from backend.db.base import utc_now
 from backend.db.models.social_intelligence import (
+    AnalysisEvidence,
     ContentAnalysisJob,
     ContentCopyAnalysis,
     ContentHookAnalysis,
@@ -25,9 +27,11 @@ from backend.db.models.social_intelligence import (
     ContentVideoAnalysis,
     ContentVideoScene,
 )
+from backend.core.config import get_settings
 from backend.db.models.social_inventory import SocialInventoryItem
 from backend.db.session import session_scope
 from backend.social_intelligence.copy_analyzer import analyze_caption
+from backend.social_intelligence.evidence_verifier import build_verified_claims, summarize_verification
 from backend.social_intelligence.creator_dna import aggregate_creator_dna
 from backend.social_intelligence.hook_analyzer import analyze_hooks
 from backend.social_intelligence.media_handler import (
@@ -36,6 +40,7 @@ from backend.social_intelligence.media_handler import (
     validate_media_url,
 )
 from backend.social_intelligence.storytelling_analyzer import analyze_storytelling
+from backend.social_intelligence.semantic_provider import get_semantic_provider
 from backend.social_intelligence.transcriber import (
     FasterWhisperTranscriber,
     MockTranscriber,
@@ -50,14 +55,43 @@ logger = logging.getLogger(__name__)
 class SocialIntelligenceWorker:
     """ThreadPool background worker processing content intelligence jobs asynchronously."""
 
-    def __init__(self, max_workers: int = 2, use_mock_transcriber: bool = False) -> None:
+    def __init__(self, max_workers: int | None = None, use_mock_transcriber: bool = False) -> None:
+        settings = get_settings()
+        max_workers = max_workers or settings.social_intelligence_max_workers
+        self._max_workers = max_workers
         self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="social-intel")
         self._futures: dict[str, Future[None]] = {}
         self._lock = Lock()
         self._closed = False
-        self._transcriber: TranscriberProtocol = (
-            MockTranscriber() if use_mock_transcriber else FasterWhisperTranscriber(model_size="base")
+        self._cancelled: set[str] = set()
+        self._uses_mock_transcriber = use_mock_transcriber
+        self._transcriber_model_size = settings.social_transcription_model
+        self._transcriber: TranscriberProtocol = MockTranscriber() if use_mock_transcriber else FasterWhisperTranscriber(
+            model_size=settings.social_transcription_model,
+            device=settings.social_transcription_device if settings.social_transcription_device != "auto" else "cpu",
+            compute_type=settings.social_transcription_compute_type,
         )
+
+    def cancel(self, job_uuid: UUID | str) -> bool:
+        """Safely cancel an enqueued or running job."""
+        job_id_str = str(job_uuid)
+        with self._lock:
+            self._cancelled.add(job_id_str)
+            fut = self._futures.get(job_id_str)
+            if fut and not fut.done():
+                fut.cancel()
+        with session_scope() as session:
+            job = session.query(ContentAnalysisJob).filter_by(uuid=UUID(job_id_str)).one_or_none()
+            if job and job.status in {"QUEUED", "PROCESSING"}:
+                job.status = "CANCELLED"
+                job.stage = "CANCELLED"
+                job.completed_at = utc_now()
+                return True
+        return False
+
+    def is_cancelled(self, job_id_str: str) -> bool:
+        with self._lock:
+            return job_id_str in self._cancelled
 
     def set_transcriber(self, transcriber: TranscriberProtocol) -> None:
         self._transcriber = transcriber
@@ -67,7 +101,7 @@ class SocialIntelligenceWorker:
         job_id_str = str(job_uuid)
         with self._lock:
             if self._closed:
-                self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="social-intel")
+                self._executor = ThreadPoolExecutor(max_workers=self._max_workers, thread_name_prefix="social-intel")
                 self._closed = False
             current = self._futures.get(job_id_str)
             if current is not None and not current.done():
@@ -76,6 +110,7 @@ class SocialIntelligenceWorker:
 
     def _execute_job(self, job_id_str: str) -> None:
         logger.info("Starting background analysis for job %s", job_id_str)
+        execution_started = time.perf_counter()
         temp_video_path: Path | None = None
         temp_audio_path: Path | None = None
 
@@ -100,6 +135,12 @@ class SocialIntelligenceWorker:
             job.started_at = utc_now()
             session.flush()
 
+            if self.is_cancelled(job_id_str):
+                job.status = "CANCELLED"
+                job.stage = "CANCELLED"
+                job.completed_at = utc_now()
+                return
+
             # Inspect media
             media_list = item.media or []
             video_url = None
@@ -113,8 +154,23 @@ class SocialIntelligenceWorker:
             media_available = False
             transcript_res = None
             video_decomp_res = None
+            options = job.options or {}
+            settings = get_settings()
+            media_budget_seconds = int(options.get("media_budget_seconds", settings.social_intelligence_media_budget_seconds))
 
-            if video_url:
+            requested_transcription_model = str(options.get("transcription_model") or settings.social_transcription_model)
+            transcriber = self._transcriber
+            if not self._uses_mock_transcriber and requested_transcription_model != self._transcriber_model_size:
+                transcriber = FasterWhisperTranscriber(
+                    model_size=requested_transcription_model,
+                    device=settings.social_transcription_device if settings.social_transcription_device != "auto" else "cpu",
+                    compute_type=settings.social_transcription_compute_type,
+                )
+
+            if video_url and known_duration and float(known_duration) > media_budget_seconds:
+                job.error_category = "MEDIA_BUDGET_EXCEEDED"
+                job.error_message = f"Video duration {known_duration}s exceeds configured media budget {media_budget_seconds}s."
+            elif video_url:
                 validation = validate_media_url(video_url)
                 if validation.is_accessible:
                     try:
@@ -138,7 +194,7 @@ class SocialIntelligenceWorker:
                 if audio_ext.has_audio and audio_ext.audio_path:
                     temp_audio_path = audio_ext.audio_path
                     try:
-                        transcript_res = self._transcriber.transcribe(temp_audio_path)
+                        transcript_res = transcriber.transcribe(temp_audio_path)
                     except Exception as exc:
                         logger.error("Transcriber threw an unexpected exception: %s", exc)
 
@@ -158,7 +214,11 @@ class SocialIntelligenceWorker:
             session.flush()
             author_info = item.author or {}
             author_name = author_info.get("display_name") or author_info.get("username")
-            copy_res = analyze_caption(item.caption, author_name=author_name)
+            copy_res = analyze_caption(
+                item.caption,
+                author_name=author_name,
+                username=author_info.get("username"),
+            )
 
             # Stage 5: Hook analysis
             job.stage = "EXTRACTING_HOOKS"
@@ -179,6 +239,7 @@ class SocialIntelligenceWorker:
             session.query(ContentCopyAnalysis).filter_by(job_id=job.id).delete()
             session.query(ContentNarrativeAnalysis).filter_by(job_id=job.id).delete()
             session.query(ContentVideoAnalysis).filter_by(job_id=job.id).delete()
+            session.query(AnalysisEvidence).filter_by(job_id=job.id).delete()
 
             # Transcript
             if transcript_res and transcript_res.full_text:
@@ -191,6 +252,10 @@ class SocialIntelligenceWorker:
                     duration_seconds=transcript_res.duration_seconds,
                     model_name=transcript_res.model_name,
                     status=transcript_res.status,
+                    raw_text=transcript_res.full_text,
+                    corrected_text=None,
+                    correction_status="not_corrected",
+                    quality_indicators=transcript_res.quality_indicators,
                 )
                 session.add(transcript_db)
                 session.flush()
@@ -224,6 +289,8 @@ class SocialIntelligenceWorker:
                 qualitative_weaknesses=hook_res.qualitative_weaknesses,
                 recommendations=hook_res.recommendations,
                 model_name=hook_res.model_name,
+                identified_hooks=hook_res.identified_hooks,
+                opening_payoff_connection=hook_res.opening_payoff_connection,
             )
             session.add(hook_db)
 
@@ -284,6 +351,9 @@ class SocialIntelligenceWorker:
                     has_subtitles=video_decomp_res.has_subtitles,
                     ending_style=video_decomp_res.ending_style,
                     production_characteristics=video_decomp_res.production_characteristics,
+                    shot_distribution=video_decomp_res.shot_distribution,
+                    audio_visual_alignment=video_decomp_res.audio_visual_alignment,
+                    visual_analysis_level=video_decomp_res.visual_analysis_level,
                 )
                 session.add(video_db)
                 session.flush()
@@ -301,18 +371,60 @@ class SocialIntelligenceWorker:
                         editing_notes=sc.editing_notes,
                         scene_classification=sc.scene_classification,
                         confidence=sc.confidence,
+                        sampled_metrics=sc.sampled_metrics,
                     )
                     session.add(scene_db)
 
+            provider_info = get_semantic_provider().get_provider_info()
+            verified_claims = build_verified_claims(
+                item_uuid=item.uuid,
+                transcript=transcript_res,
+                caption=item.caption,
+                hook_result=hook_res,
+                copy_result=copy_res,
+                narrative_result=story_res,
+                video_result=video_decomp_res,
+                provider_name=provider_info.provider_name,
+                provider_model=hook_res.model_name,
+            )
+            for claim in verified_claims:
+                session.add(AnalysisEvidence(job_id=job.id, **asdict(claim)))
+
+            verification_summary = summarize_verification(verified_claims)
+            transcript_ok = bool(transcript_res and transcript_res.status == "completed" and transcript_res.full_text)
+            video_ok = bool(video_decomp_res and video_decomp_res.scenes)
+            expected_video = bool(video_url)
+            job.quality_summary = {
+                "evidence": verification_summary,
+                "transcription": transcript_res.quality_indicators if transcript_res else None,
+                "semantic_provider": provider_info.model_dump(),
+            }
+            job.completion_summary = {
+                "caption_analysis": True,
+                "transcription": transcript_ok,
+                "video_frame_statistics": video_ok,
+                "semantic_llm_executed": provider_info.analysis_kind == "llm" and provider_info.last_execution == "succeeded",
+                "evidence_quality": verification_summary["quality_status"],
+            }
+            job.resource_usage = {
+                "elapsed_seconds": round(time.perf_counter() - execution_started, 3),
+                "media_bytes": temp_video_path.stat().st_size if temp_video_path and temp_video_path.exists() else 0,
+                "transcription_model": transcript_res.model_name if transcript_res else requested_transcription_model,
+                "transcription_device": settings.social_transcription_device,
+                "semantic_model": provider_info.model_id,
+                "media_budget_seconds": media_budget_seconds,
+            }
+
             # Final status determination
-            if media_available:
+            if (not expected_video or (video_ok and transcript_ok)) and verification_summary["quality_status"] == "passed":
                 job.status = "COMPLETED"
             else:
                 job.status = "PARTIAL"
-                job.error_category = "MEDIA_UNAVAILABLE"
-                job.error_message = "Video media was inaccessible or expired; text and caption analysis completed."
+                if not job.error_category:
+                    job.error_category = "PARTIAL_ANALYSIS"
+                    job.error_message = "One or more requested media, transcription, semantic, or evidence checks did not complete."
 
-            job.stage = "COMPLETED"
+            job.stage = "COMPLETED" if job.status == "COMPLETED" else "PARTIAL"
             job.progress_percent = 100.0
             job.completed_at = utc_now()
             session.flush()
